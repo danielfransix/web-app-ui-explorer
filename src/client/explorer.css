@@ -1,0 +1,112 @@
+.design-workbench {
+  @apply min-h-screen bg-canvas-subtle text-fg;
+}
+.design-workbench-header {
+  @apply flex h-18 items-center justify-between border-b border-border bg-canvas pr-8;
+  /* Title's left edge lines up with the collapsed source-explorer icon below it: (rail 3.5rem - 1px border - 20px icon) / 2. */
+  padding-left: calc((var(--spacing) * 14 - 1px - 20px) / 2);
+}
+.design-workbench-badge {
+  @apply rounded-full border border-border px-3 py-1.5 text-xs text-fg-subtle;
+}
+.design-workbench-metrics {
+  @apply flex items-center gap-4;
+}
+.design-workbench-metrics div {
+  @apply flex flex-col gap-1 border-l border-border pl-3;
+}
+.design-workbench-metrics strong { @apply font-semibold text-2xl; }
+.design-workbench-metrics span { @apply text-xs text-fg-subtle; }
+.design-workbench-toolbar {
+  @apply flex flex-wrap items-center gap-4 border-b border-border bg-canvas px-8 py-3;
+}
+.design-workbench-views { @apply flex gap-1 rounded-lg bg-slate-100 p-1; }
+.design-view-tab { @apply flex items-center gap-2 rounded-md px-4 py-2 text-sm text-fg-muted; }
+.design-view-tab[data-active="true"] { @apply bg-canvas font-semibold text-brand shadow-xs; }
+.design-workbench-search { @apply ml-auto flex min-w-0 items-center gap-3 text-slate-400; }
+.design-workbench-search input { @apply w-72 bg-transparent text-sm text-fg outline-none; }
+.design-workbench-toolbar > .control-select { @apply w-56; }
+.design-workbench-toolbar .control { @apply mt-0 h-10 text-sm; }
+.design-workbench-sectionline { @apply flex items-center gap-3 px-8 pb-4 pt-6 text-xs text-fg-subtle; }
+.design-issues { @apply m-0 flex list-none flex-col gap-3 p-0; }
+.design-issue { @apply flex flex-col items-start gap-3 rounded-lg border border-border bg-canvas p-4; }
+.design-issue__head { @apply flex w-full items-center justify-between gap-3 text-sm; }
+.design-issue__reason { @apply m-0 w-full break-words rounded-md bg-red-50 px-3 py-2 font-mono text-xs leading-5 text-red-700; }
+.design-issue dl { @apply m-0 flex w-full flex-col gap-1; }
+.design-issue__where { @apply flex items-center gap-3 text-xs; }
+.design-issue__where dt { @apply w-14 shrink-0 text-fg-subtle; }
+.design-issue__where dd { @apply m-0 flex min-w-0 flex-1 items-center justify-between gap-2; }
+.design-issue__where code { @apply min-w-0 break-all font-mono text-fg-muted; }
+.design-workbench-popover { @apply w-88 max-w-full rounded-xl border border-border bg-canvas p-5 shadow-lg; }
+.design-screen-grid { @apply grid grid-cols-1 gap-6 px-8 pb-10 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4; }
+.design-screen-card { @apply overflow-hidden rounded-[7.2px] border border-border bg-canvas transition-shadow hover:shadow-lg; }
+.design-state-pill { @apply rounded-full bg-slate-100 px-2 py-1 text-2xs text-fg-muted; }
+.design-state-pill--branch { @apply bg-brand-subtle text-brand; }
+.design-screen-card__preview { @apply relative block w-full overflow-hidden text-left; }
+.design-screen-card__open { @apply absolute inset-0 z-10 block size-full cursor-pointer; }
+.design-screen-card__body { @apply border-t border-slate-100 px-4 py-3; }
+.design-screen-card__title { @apply block w-full truncate text-left font-semibold text-sm; }
+.design-screen-card__path { @apply min-w-0 truncate text-2xs leading-4 text-fg-muted; }
+.design-screen-card__meta { @apply mt-1 flex min-h-6 items-center justify-between gap-2; }
+.screen-thumbnail { @apply relative overflow-hidden bg-canvas; aspect-ratio: 1280 / 900; }
+.screen-thumbnail__frame { position: absolute; width: 1280px; height: 900px; border: 0; transform-origin: top left; pointer-events: none; }
+.screen-thumbnail__image { @apply block size-full object-cover object-top; }
+.screen-thumbnail__loading { @apply absolute inset-0 flex items-center justify-center gap-2 bg-canvas-subtle text-xs text-fg-muted; }
+.design-workbench-layout { @apply flex items-start; }
+.design-workbench-content { @apply flex min-h-[calc(100dvh-4.5rem)] min-w-0 flex-1 flex-col; }
+.design-folder-sidebar { @apply sticky top-0 flex h-[calc(100dvh-4.5rem)] w-80 shrink-0 flex-col border-r border-border bg-canvas; }
+.design-folder-sidebar__heading { @apply flex items-center justify-between gap-2 py-2 pl-5 pr-3 text-sm; }
+.design-folder-sidebar[data-collapsed="true"] { @apply w-14 items-center pt-3; }
+.design-folder-tree { @apply min-h-0 flex-1 list-none overflow-auto px-3 pb-4; }
+.design-folder-children { @apply ml-3 list-none border-l border-slate-100 pl-2; }
+.design-folder-row { @apply flex min-h-9 items-center gap-2 rounded-md px-2 hover:bg-canvas-subtle; }
+.design-folder-row[data-selected="true"] { @apply bg-brand-subtle; }
+.design-folder-checkbox { @apply flex size-4 shrink-0 items-center justify-center rounded border border-slate-300 bg-canvas text-white; }
+.design-folder-checkbox[aria-checked="true"], .design-folder-checkbox[aria-checked="mixed"] { @apply border-brand bg-brand; }
+.design-folder-label { @apply flex min-w-0 flex-1 items-center gap-1.5 text-left text-xs text-fg-muted; }
+.design-folder-label > span { @apply truncate; }
+.design-folder-row > small { @apply shrink-0 rounded bg-slate-100 px-1.5 text-2xs text-fg-muted; }
+.design-folder-empty { @apply flex flex-1 flex-col items-center justify-center gap-3 px-8 pb-16 text-center text-slate-400; }
+.design-folder-empty h2 { @apply font-semibold text-base text-fg-subtle; }
+.design-preview-shell { @apply flex h-dvh flex-col bg-slate-100; }
+.design-preview-bar { @apply flex shrink-0 items-center gap-3 border-b border-border bg-canvas px-4 py-3; }
+.design-preview-picker { @apply min-w-0 flex-1; }
+.design-preview-picker .control { @apply mt-0 h-8; }
+.design-preview-bar .ds-button--size-icon { @apply size-8; }
+.design-lightbox-stage { @apply mx-auto w-full overflow-hidden rounded-lg border border-border bg-canvas; max-width: calc((100dvh - 15rem) * 1280 / 900); }
+.design-lightbox-meta { @apply flex min-w-0 flex-wrap items-center justify-between gap-3 text-xs text-fg-subtle; }
+.design-lightbox-actions { @apply flex flex-wrap items-center justify-end gap-3; }
+.screen-live-viewport { @apply relative min-h-0 flex-1; }
+.screen-live-frame { @apply h-full w-full border-0; }
+.preview-recipe-error { @apply fixed left-4 top-4 z-50 max-w-lg rounded-lg border border-red-200 bg-canvas p-3 text-sm text-red-600 shadow-lg; }
+.design-flow-canvas { @apply relative mx-8 mb-8 overflow-hidden rounded-xl border border-border bg-canvas-subtle; height: max(560px, calc(100dvh - 280px)); }
+.design-flow-node { @apply h-full overflow-hidden rounded-[7.2px] border border-border bg-canvas shadow-sm; width: 336px; height: 284px; }
+.design-flow-node__title { @apply flex h-12 w-full items-center truncate px-4 text-left font-semibold text-sm; }
+.design-flow-overview { @apply flex flex-col items-center justify-center gap-3 bg-canvas-subtle p-8 text-center font-semibold text-lg text-slate-700; aspect-ratio: 1280 / 900; }
+.design-flow-overview small { @apply font-sans text-xs text-fg-muted; }
+.design-flow-canvas .react-flow__edge-text { @apply font-sans text-2xs; }
+.design-flow-node .react-flow__handle { @apply size-3 border-2 border-white bg-brand; }
+.design-flow-canvas .react-flow__edge-path { stroke: var(--color-slate-350); stroke-width: 1.5; }
+.design-flow-controls { @apply absolute bottom-5 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-border bg-canvas p-2 shadow-lg; }
+.design-flow-controls .ds-button--size-icon { @apply size-8; }
+.design-flow-zoom { @apply w-12 text-center text-xs text-fg-subtle; }
+.design-flow-status { @apply absolute right-5 top-5 z-10 rounded-lg border border-border bg-canvas px-4 py-3 text-sm text-fg-subtle shadow-sm; }
+.design-shortcut-hint { @apply flex items-center gap-1 text-2xs text-slate-400; }
+.design-shortcut-hint kbd { @apply rounded border border-border bg-canvas-subtle px-1.5 py-1 font-sans; }
+@media (max-width: 767px) {
+  .design-workbench-toolbar { @apply flex-wrap; }
+  .design-workbench-search { @apply ml-0 flex-1; }
+  .design-workbench-search input { @apply w-full; }
+  .design-workbench-metrics { @apply gap-4; }
+  .design-workbench-badge, .design-shortcut-hint { @apply hidden; }
+  .design-workbench-layout { @apply flex-col; }
+  /* Stacked layout: the icon sits in a 40px button inset by px-3, so its left edge is 12px + 10px. */
+  .design-workbench-header { padding-left: calc(var(--spacing) * 3 + 10px); }
+  .design-folder-sidebar { @apply relative h-72 w-full border-b border-r-0; }
+  .design-folder-sidebar[data-collapsed="true"] { @apply h-auto w-full items-start px-3 pb-3; }
+  .design-workbench-content { @apply w-full; }
+}
+.design-job { @apply flex items-center gap-2 text-xs text-fg-subtle; }
+.design-job--error { @apply text-danger; }
+.design-loading { @apply flex min-h-screen items-center justify-center text-sm text-fg-subtle; }
+.design-origin { @apply mt-4 flex gap-1; }

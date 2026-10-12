@@ -1,0 +1,85 @@
+{
+  "name": "@danielfransix/ui-explorer",
+  "version": "0.1.0",
+  "description": "Explore every screen and state of a front-end app: an automatic crawler, a source-driven explorer, a flow canvas and thumbnails. Development tool; a read-only snapshot can optionally be shipped with a build.",
+  "author": "Daniel Fransix",
+  "license": "MIT",
+  "homepage": "https://github.com/danielfransix/ui-explorer#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danielfransix/ui-explorer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/danielfransix/ui-explorer/issues"
+  },
+  "keywords": [
+    "vite",
+    "vite-plugin",
+    "ui",
+    "screens",
+    "storybook-alternative",
+    "design",
+    "crawler",
+    "playwright",
+    "screenshots",
+    "component-gallery"
+  ],
+  "type": "module",
+  "private": false,
+  "bin": {
+    "ui-explorer": "./dist/node/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/node/index.d.ts",
+      "import": "./dist/node/index.js"
+    },
+    "./vite": {
+      "types": "./dist/node/vite.d.ts",
+      "import": "./dist/node/vite.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsup && vite build --config vite.client.config.ts",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.mjs",
+    "ui-explorer": "node dist/node/cli.js",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "dependencies": {
+    "playwright": "1.64.0"
+  },
+  "peerDependencies": {
+    "vite": ">=5"
+  },
+  "devDependencies": {
+    "@base-ui/react": "1.9.0",
+    "@phosphor-icons/react": "^2.1.10",
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^6.0.0",
+    "@xyflow/react": "12.12.0",
+    "elkjs": "0.12.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwindcss": "^4.0.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.7.0",
+    "vite": "^8.0.5"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

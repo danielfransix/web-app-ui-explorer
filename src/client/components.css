@@ -1,0 +1,204 @@
+/* The explorer's own controls: buttons, fields, dropdowns, dialogs, tooltips. */
+
+body {
+  @apply m-0 min-w-80 font-sans;
+}
+
+button {
+  @apply font-sans;
+}
+
+button:focus-visible {
+  @apply outline-2 outline-offset-2 outline-focus;
+}
+
+/* Buttons ------------------------------------------------------------------------------------------------ */
+.ds-button {
+  @apply inline-flex shrink-0 items-center justify-center gap-1 overflow-hidden rounded-md border-0 font-semibold text-sm not-italic leading-5.25 tracking-normal whitespace-nowrap cursor-pointer transition-[color,background-color,border-color,opacity,box-shadow];
+}
+.ds-button--size-default {
+  @apply h-10 px-4 py-2;
+}
+.ds-button--size-sm {
+  @apply h-8 px-3;
+}
+.ds-button--size-icon {
+  @apply size-10 p-0;
+}
+.ds-button__icon {
+  @apply flex size-4 shrink-0 items-center justify-center;
+}
+.ds-button__label {
+  @apply flex min-w-0 items-center justify-center;
+}
+.ds-button--variant-default {
+  @apply bg-brand text-slate-50;
+}
+.ds-button--variant-default:hover {
+  @apply opacity-90;
+}
+.ds-button--variant-outline {
+  @apply border-(length:--border-width-ui) border-slate-300 bg-canvas text-fg shadow-xs;
+}
+.ds-button--variant-outline:hover:not(:disabled) {
+  @apply border-brand bg-canvas text-brand;
+}
+.ds-button--variant-ghost {
+  @apply bg-transparent text-fg;
+}
+.ds-button--variant-ghost:hover {
+  @apply bg-slate-100;
+}
+.ds-button--variant-ghost-slim,
+.ds-button--variant-link-danger {
+  @apply h-auto bg-transparent p-0 text-fg;
+}
+.ds-button--variant-ghost-slim:hover:not(:disabled) {
+  @apply rounded-sm bg-brand-subtle px-1 text-brand;
+}
+.ds-button--variant-link-danger {
+  @apply text-danger;
+}
+.ds-button--variant-link-danger:hover:not(:disabled) {
+  @apply rounded-sm bg-red-50 px-1 text-red-600;
+}
+.ds-button--variant-secondary-2 {
+  @apply bg-brand-subtle text-brand;
+}
+.ds-button:disabled {
+  @apply opacity-50 cursor-not-allowed;
+}
+
+/* Fields and dropdowns ----------------------------------------------------------------------------------- */
+.control {
+  @apply mt-1 h-12 w-full rounded-md border-(length:--border-width-ui) border-border bg-canvas px-4 font-sans text-sm font-normal leading-5.25 text-fg outline-none transition-colors;
+}
+.control:focus {
+  @apply border-brand;
+}
+.control:disabled {
+  @apply bg-canvas-subtle text-slate-400;
+}
+.control-select {
+  @apply relative block w-full;
+}
+.control-select .control {
+  @apply pr-11;
+}
+.control--select {
+  @apply flex cursor-pointer items-center text-left;
+}
+.control--select[data-placeholder="true"] {
+  @apply text-slate-400;
+}
+.control--select:disabled {
+  @apply cursor-not-allowed;
+}
+.control-select__value {
+  @apply min-w-0 flex-1 truncate;
+}
+.control-select svg {
+  @apply pointer-events-none absolute right-4 top-1/2 mt-0.5 -translate-y-1/2 text-fg-muted;
+}
+.control-select:has(> .control:focus:not(:disabled)) > svg {
+  @apply text-brand;
+}
+.select-menu {
+  @apply absolute left-0 top-full z-30 m-0 mt-2 max-h-72 w-full list-none overflow-y-auto rounded-lg border-(length:--border-width-ui) border-border bg-canvas p-0 shadow-lg;
+}
+.select-menu__option {
+  @apply flex cursor-pointer items-center justify-between gap-3 px-3 py-2.5 font-sans text-sm leading-5.25 text-fg;
+}
+.select-menu__option-copy {
+  @apply flex min-w-0 flex-1 flex-col;
+}
+.select-menu__option[aria-selected="true"] {
+  @apply font-medium;
+}
+.select-menu__option[data-highlighted] {
+  @apply bg-slate-100 outline-none;
+}
+.select-menu__option svg {
+  @apply shrink-0 text-brand;
+}
+
+/* Popups ------------------------------------------------------------------------------------------------- */
+.uix-popup-positioner,
+.uix-select-positioner {
+  @apply z-50;
+}
+.uix-tooltip-positioner {
+  z-index: 1000;
+}
+.uix-select-positioner {
+  width: var(--anchor-width);
+  max-width: var(--available-width);
+}
+.uix-popup {
+  position: relative;
+  inset: auto;
+  margin: 0;
+  max-width: var(--available-width);
+  max-height: var(--available-height);
+  overflow-y: auto;
+}
+.tooltip-label {
+  @apply rounded-md bg-slate-900 px-2 py-1 font-sans text-xs font-normal leading-4 text-white shadow-md;
+}
+
+/* Dialogs ------------------------------------------------------------------------------------------------ */
+.modal-layer {
+  @apply fixed inset-0 z-50 flex;
+}
+.modal-layer--center {
+  @apply items-center justify-center p-5;
+}
+.modal-backdrop {
+  @apply absolute inset-0 h-full w-full cursor-default border-0 bg-slate-900/50;
+}
+.modal-shell {
+  @apply relative flex min-h-0 flex-col rounded-md border-(length:--border-width-ui) border-border bg-canvas p-1 shadow-md outline-none;
+}
+.modal-shell--center {
+  @apply max-h-full w-full max-w-110;
+}
+.modal-shell--expanded {
+  @apply max-w-6xl;
+}
+.modal-shell--side {
+  @apply absolute inset-y-1 right-1 w-full max-w-[calc(100%-var(--spacing)*2)] lg:w-150;
+}
+.modal-master-header {
+  @apply flex min-h-10 shrink-0 items-center gap-2.5 border-b-(length:--border-width-ui) border-border pb-1 pl-3;
+}
+.modal-header-copy {
+  @apply flex min-w-0 flex-1 flex-col gap-1.5;
+}
+.modal-header-title {
+  @apply m-0 font-semibold text-sm leading-5.25 text-fg;
+}
+.modal-shell--side .modal-master-header {
+  @apply py-3;
+}
+.modal-shell--side .modal-header-title {
+  @apply text-xl leading-7.5;
+}
+.modal-master-body {
+  container-type: inline-size;
+  @apply flex min-h-0 min-w-0 flex-col gap-1 overflow-y-auto px-3 pt-3;
+}
+.modal-shell--side .modal-master-body {
+  @apply flex-1 gap-5 pb-3;
+}
+.modal-description {
+  @apply m-0 font-sans text-sm font-normal leading-5.25 text-fg-subtle;
+}
+.modal-master-footer {
+  @apply shrink-0 px-3 py-3;
+}
+.drawer-close {
+  @apply flex size-9 shrink-0 items-center justify-center rounded-lg border-0 bg-transparent text-fg-subtle cursor-pointer;
+}
+.drawer-close:hover {
+  @apply bg-slate-100 text-fg;
+}

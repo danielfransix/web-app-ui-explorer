@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Demo app</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 0; }
+      nav { display: flex; gap: 8px; padding: 12px; border-bottom: 1px solid #ddd; }
+      main { padding: 24px; }
+      .dialog { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: grid; place-items: center; }
+      .dialog > div { background: white; padding: 24px; border-radius: 8px; min-width: 280px; }
+      [role="listbox"] { border: 1px solid #ccc; padding: 4px; margin-top: 4px; width: 200px; }
+      [role="option"] { padding: 6px; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <nav aria-label="Main">
+      <button id="go-home">Home</button>
+      <button id="go-settings">Settings</button>
+      <button id="go-reports">Reports</button>
+    </nav>
+    <main id="view"></main>
+    <script>
+      // A small single-page app with no framework: two screens, a dialog, a dropdown, a form with validation.
+      const view = document.getElementById("view")
+      let screen = "home"
+      let frequency = ""
+      let listOpen = false
+      let saved = false
+      let dialog = false
+      let name = ""
+      let error = ""
+
+      function render() {
+        if (screen === "home") {
+          view.innerHTML = `
+            <h1>Welcome</h1>
+            <p>This is the home screen.</p>
+            <button id="help">Open help</button>
+            ${dialog ? `<div class="dialog"><div role="dialog" aria-modal="true" aria-labelledby="d-title"><h2 id="d-title">Help centre</h2><p>Ask us anything.</p><button id="close-help">Close</button></div></div>` : ""}`
+        } else if (screen === "settings") {
+          view.innerHTML = `
+            <h1>Settings</h1>
+            <label>Display name <input id="name" value="${name}" /></label>
+            ${error ? `<p role="alert">${error}</p>` : ""}
+            <div>
+              <button id="frequency" role="combobox" aria-expanded="${listOpen}">${frequency || "Choose frequency"}</button>
+              ${listOpen ? `<div role="listbox"><div role="option">Weekly</div><div role="option">Monthly</div></div>` : ""}
+            </div>
+            <button id="save">Save changes</button>
+            ${saved ? `<p>Settings saved</p>` : ""}`
+        } else {
+          view.innerHTML = `<h1>Reports</h1><p>Nothing to show yet.</p>`
+        }
+      }
+
+      view.addEventListener("click", (event) => {
+        const target = event.target.closest("button,[role=option]")
+        if (!target) return
+        if (target.id === "help") dialog = true
+        if (target.id === "close-help") dialog = false
+        if (target.id === "frequency") listOpen = !listOpen
+        if (target.getAttribute("role") === "option") { frequency = target.textContent; listOpen = false }
+        if (target.id === "save") {
+          name = document.getElementById("name").value
+          if (!name) error = "Display name is required"
+          else { error = ""; setTimeout(() => { saved = true; render() }, 200) }
+        }
+        render()
+      })
+      document.querySelector("nav").addEventListener("click", (event) => {
+        const id = event.target.id
+        if (!id) return
+        screen = id.replace("go-", "")
+        dialog = false; listOpen = false; saved = false; error = ""
+        render()
+      })
+      render()
+    </script>
+  </body>
+</html>

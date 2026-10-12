@@ -1,0 +1,73 @@
+/*
+ * Explorer theme. The explorer is its own page, so it carries its own tokens and does not depend on the
+ * app it explores. Override the variables in :root to retheme it; roles (canvas, fg, border, brand) are
+ * what the interface uses.
+ */
+
+@font-face {
+  font-family: "Gilroy";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/Gilroy-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Gilroy";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./fonts/Gilroy-Medium.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Gilroy";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./fonts/Gilroy-SemiBold.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Gilroy";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./fonts/Gilroy-Bold.woff2") format("woff2");
+}
+
+@theme {
+  --font-sans: "Gilroy", ui-sans-serif, system-ui, sans-serif;
+
+  --text-2xs: 0.625rem;
+
+  --color-slate-350: #b0c0d4;
+
+  --color-accent-50: #e2eafe;
+  --color-accent-100: #ccdbfd;
+  --color-accent-200: #99b7fb;
+  --color-accent-300: #6692f9;
+  --color-accent-400: #336ef7;
+  --color-accent-500: #004af5;
+  --color-accent-600: #003bc4;
+  --color-accent-700: #002c93;
+
+  --border-width-ui: 1.4px;
+}
+
+@theme inline {
+  --color-canvas: var(--color-white);
+  --color-canvas-subtle: var(--color-slate-50);
+
+  --color-fg: var(--color-slate-900);
+  --color-fg-muted: var(--color-slate-600);
+  --color-fg-subtle: var(--color-slate-500);
+
+  --color-border: var(--color-slate-200);
+  --color-focus: var(--color-accent-200);
+
+  --color-brand: var(--color-accent-500);
+  --color-brand-hover: var(--color-accent-600);
+  --color-brand-subtle: var(--color-accent-50);
+  --color-brand-on-subtle: var(--color-accent-700);
+
+  --color-danger: var(--color-red-500);
+  --color-on-brand: var(--color-white);
+}
