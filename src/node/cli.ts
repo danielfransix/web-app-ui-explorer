@@ -8,12 +8,12 @@ import { computeRevision } from "./revision"
 import { guessSources } from "./sources"
 import type { ScenariosFile } from "../shared/types"
 
-const HELP = `ui-explorer
+const HELP = `web-app-ui-explorer
 
 Usage
-  ui-explorer init                       Add the explorer to a Vite project
-  ui-explorer crawl --url <server> ...   Explore the running app and write its scenarios
-  ui-explorer capture --url <server> ... Take thumbnails of the scenarios
+  web-app-ui-explorer init                       Add the explorer to a Vite project
+  web-app-ui-explorer crawl --url <server> ...   Explore the running app and write its scenarios
+  web-app-ui-explorer capture --url <server> ... Take thumbnails of the scenarios
 
 Options for crawl
   --url <url>            Origin of the running dev server (required)
@@ -90,7 +90,7 @@ async function main() {
     const dir = path.resolve(root, one("dir") ?? ".ui-explorer")
     const file = path.join(dir, "scenarios.json")
     if (!fs.existsSync(file)) {
-      console.error(`No scenarios found at ${file}. Run \`ui-explorer crawl\` first.`)
+      console.error(`No scenarios found at ${file}. Run \`web-app-ui-explorer crawl\` first.`)
       process.exit(1)
     }
     const scenarios = JSON.parse(fs.readFileSync(file, "utf8")) as ScenariosFile

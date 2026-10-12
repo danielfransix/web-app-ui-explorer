@@ -2,7 +2,7 @@ import fs from "node:fs"
 import path from "node:path"
 
 const CONFIGS = ["vite.config.ts", "vite.config.mts", "vite.config.js", "vite.config.mjs", "vite.config.cjs"]
-const IMPORT = `import uiExplorer from "@danielfransix/ui-explorer/vite"`
+const IMPORT = `import uiExplorer from "@danielfransix/web-app-ui-explorer/vite"`
 
 function packageManager(root: string) {
   if (fs.existsSync(path.join(root, "pnpm-lock.yaml")) || fs.existsSync(path.join(root, "pnpm-workspace.yaml")))
@@ -22,7 +22,7 @@ export function init(root: string, log: (line: string) => void): boolean {
   }
   const name = path.basename(configFile)
   let source = fs.readFileSync(configFile, "utf8")
-  if (source.includes("@danielfransix/ui-explorer")) {
+  if (source.includes("@danielfransix/web-app-ui-explorer")) {
     log(`${name} already uses the explorer.`)
   } else {
     const imports = [...source.matchAll(/^import .*$/gm)]
@@ -48,6 +48,6 @@ export function init(root: string, log: (line: string) => void): boolean {
     log("Added .ui-explorer/ to .gitignore.")
   }
 
-  log(`\nNext:\n  1. ${packageManager(root)} @danielfransix/ui-explorer   (if it is not installed yet)\n  2. Start your dev server and open /__explorer/\n  3. Press Explore. It finds your screens and states by itself.`)
+  log(`\nNext:\n  1. ${packageManager(root)} @danielfransix/web-app-ui-explorer   (if it is not installed yet)\n  2. Start your dev server and open /__explorer/\n  3. Press Explore. It finds your screens and states by itself.`)
   return true
 }

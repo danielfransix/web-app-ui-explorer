@@ -105,7 +105,7 @@ test("init adds the plugin to a Vite config once and keeps generated files out o
   const lines = []
   assert.equal(init(root, (line) => lines.push(line)), true)
   const config = fs.readFileSync(path.join(root, "vite.config.ts"), "utf8")
-  assert.match(config, /import uiExplorer from "@danielfransix\/ui-explorer\/vite"/)
+  assert.match(config, /import uiExplorer from "@danielfransix\/web-app-ui-explorer\/vite"/)
   assert.match(config, /plugins: \[\s*uiExplorer\(\),\s*react\(\)\]/)
   assert.match(fs.readFileSync(path.join(root, ".gitignore"), "utf8"), /^\.ui-explorer\/$/m)
   // Running it again changes nothing.

@@ -1,27 +1,29 @@
-# UI Explorer
+# Web App UI Explorer
 
 See every screen and state of a front-end app in one place, without writing a line of configuration.
 
-UI Explorer opens your running app in a headless browser and explores it the way a careful tester would. It follows the flow, opens dialogs, tries dropdown choices and submits forms, then records each distinct state as a **scenario**: a name, a starting point and the clicks that reach it. The explorer shows them as a gallery of thumbnails, a flow canvas that connects them, and a source tree that places each state in the file that renders it.
+Web App UI Explorer opens your running web app in a headless browser and explores it the way a careful tester would. It follows the flow, opens dialogs, tries dropdown choices and submits forms, then records each distinct state as a **scenario**: a name, a starting point and the clicks that reach it. The explorer shows them as a gallery of thumbnails, a flow canvas that connects them, and a source tree that places each state in the file that renders it.
 
-It is a development tool. By default nothing is added to your production build; if you want teammates to browse the screens on a deployed internal URL, you can opt in to a read-only snapshot (see [Shipping it with a build](#shipping-it-with-a-build)).
+It is for **web apps** (anything a browser can render, built with any framework or none). It is a development tool. By default nothing is added to your production build; if you want teammates to browse the screens on a deployed internal URL, you can opt in to a read-only snapshot (see [Shipping it with a build](#shipping-it-with-a-build)).
+
+> **Renamed.** This package was briefly published as `@danielfransix/ui-explorer`. Use `@danielfransix/web-app-ui-explorer`.
 
 ## Install
 
 From the root of your Vite project:
 
 ```sh
-npx @danielfransix/ui-explorer init      # adds the Vite plugin and a .gitignore entry
-pnpm add -D @danielfransix/ui-explorer   # or npm install -D / yarn add -D
+npx @danielfransix/web-app-ui-explorer init      # adds the Vite plugin and a .gitignore entry
+pnpm add -D @danielfransix/web-app-ui-explorer   # or npm install -D / yarn add -D
 ```
 
-The package is on the public npm registry, so no account, token or `.npmrc` is needed. After it is installed, `npx ui-explorer` runs the local copy.
+The package is on the public npm registry, so no account, token or `.npmrc` is needed. After it is installed, `npx web-app-ui-explorer` runs the local copy (the shorter `ui-explorer` command still works as an alias).
 
 `init` edits your Vite config for you. To do it by hand:
 
 ```ts
 // vite.config.ts
-import uiExplorer from "@danielfransix/ui-explorer/vite"
+import uiExplorer from "@danielfransix/web-app-ui-explorer/vite"
 
 export default defineConfig({
   plugins: [uiExplorer()],
@@ -115,9 +117,9 @@ A preview page you render yourself reports back by posting `{ type: "uix:ready",
 ## Command line
 
 ```sh
-ui-explorer init                          # add the plugin to a Vite project
-ui-explorer crawl --url http://localhost:5173 --root .
-ui-explorer capture --url http://localhost:5173
+web-app-ui-explorer init                          # add the plugin to a Vite project
+web-app-ui-explorer crawl --url http://localhost:5173 --root .
+web-app-ui-explorer capture --url http://localhost:5173
 ```
 
 `crawl --debug` also prints every recipe that fails to replay and saves what each state looked like next to the scenarios file. Run `ui-explorer help` for every option.
@@ -143,7 +145,7 @@ The package is versioned with semver and published to npm by the release workflo
   "extends": ["config:recommended"],
   "packageRules": [
     {
-      "matchPackageNames": ["@danielfransix/ui-explorer"],
+      "matchPackageNames": ["@danielfransix/web-app-ui-explorer"],
       "matchUpdateTypes": ["minor", "patch"],
       "automerge": true
     }

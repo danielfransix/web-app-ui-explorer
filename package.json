@@ -1,32 +1,36 @@
 {
-  "name": "@danielfransix/ui-explorer",
-  "version": "0.1.0",
-  "description": "Explore every screen and state of a front-end app: an automatic crawler, a source-driven explorer, a flow canvas and thumbnails. Development tool; a read-only snapshot can optionally be shipped with a build.",
+  "name": "@danielfransix/web-app-ui-explorer",
+  "version": "0.2.0",
+  "description": "Explore every screen and state of a web app (Vite): an automatic crawler, a source-driven explorer, a flow canvas and thumbnails. Works with any front-end framework, or none.",
   "author": "Daniel Fransix",
   "license": "MIT",
-  "homepage": "https://github.com/danielfransix/ui-explorer#readme",
+  "homepage": "https://github.com/danielfransix/web-app-ui-explorer#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/danielfransix/ui-explorer.git"
+    "url": "git+https://github.com/danielfransix/web-app-ui-explorer.git"
   },
   "bugs": {
-    "url": "https://github.com/danielfransix/ui-explorer/issues"
+    "url": "https://github.com/danielfransix/web-app-ui-explorer/issues"
   },
   "keywords": [
+    "component-gallery",
+    "crawler",
+    "design",
+    "playwright",
+    "screens",
+    "screenshots",
+    "storybook-alternative",
+    "ui",
+    "ui-explorer",
     "vite",
     "vite-plugin",
-    "ui",
-    "screens",
-    "storybook-alternative",
-    "design",
-    "crawler",
-    "playwright",
-    "screenshots",
-    "component-gallery"
+    "web-app",
+    "web-app-ui-explorer"
   ],
   "type": "module",
   "private": false,
   "bin": {
+    "web-app-ui-explorer": "./dist/node/cli.js",
     "ui-explorer": "./dist/node/cli.js"
   },
   "exports": {

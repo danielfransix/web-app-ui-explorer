@@ -1,6 +1,6 @@
 name: Release
 
-# Publishes @danielfransix/ui-explorer to the public npm registry when a version tag is pushed:
+# Publishes @danielfransix/web-app-ui-explorer to the public npm registry when a version tag is pushed:
 #
 #   1. Bump "version" in package.json and merge it.
 #   2. git tag v0.2.0 && git push origin v0.2.0
