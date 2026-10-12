@@ -6,6 +6,33 @@ Web App UI Explorer opens your running web app in a headless browser and explore
 
 It is for **web apps** (anything a browser can render, built with any framework or none). It is a development tool. By default nothing is added to your production build; if you want teammates to browse the screens on a deployed internal URL, you can opt in to a read-only snapshot (see [Shipping it with a build](#shipping-it-with-a-build)).
 
+## What it looks like
+
+These are the real explorer pages, running on [`examples/vanilla-demo`](examples/vanilla-demo): a small billing app in plain HTML, CSS and JavaScript, with no framework. The crawler found its 43 states on its own.
+
+**Gallery.** Every state as a thumbnail, with the source folders on the left. Pick any combination of folders to scope what you see.
+
+![The gallery view: a source tree on the left and thumbnails of each discovered screen and state](https://raw.githubusercontent.com/danielfransix/web-app-ui-explorer/main/docs/images/gallery.png)
+
+**Canvas.** The states connected by the control that leads from one to the next. Here, only the navigation and dialog states are selected.
+
+![The canvas view: screens as nodes, with labelled arrows showing which control leads to which state](https://raw.githubusercontent.com/danielfransix/web-app-ui-explorer/main/docs/images/canvas.png)
+
+**One screen, enlarged.** Open any state in the live app, with arrow keys to move between states and a link out to the real page.
+
+![A single state, the Create invoice dialog, shown large with navigation controls at the top](https://raw.githubusercontent.com/danielfransix/web-app-ui-explorer/main/docs/images/screen.png)
+
+**Floating launcher.** In development, a small button sits at the bottom-left of your app. Click it, or press **Alt + Shift + E**, to open the explorer. Drag it if it covers something; a refresh puts it back.
+
+![The demo app with the round explorer launcher button at the bottom-left of the sidebar](https://raw.githubusercontent.com/danielfransix/web-app-ui-explorer/main/docs/images/launcher.png)
+
+Try it yourself in this repository:
+
+```sh
+npm install
+npm run demo        # builds the package, then serves the demo app with the explorer at /__explorer/
+```
+
 > **Renamed.** This package was briefly published as `@danielfransix/ui-explorer`. Use `@danielfransix/web-app-ui-explorer`.
 
 ## Install

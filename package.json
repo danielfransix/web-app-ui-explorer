@@ -57,6 +57,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --test test/*.test.mjs",
     "ui-explorer": "node dist/node/cli.js",
+    "demo": "npm run build && vite examples/vanilla-demo",
     "prepublishOnly": "npm run build && npm test"
   },
   "dependencies": {

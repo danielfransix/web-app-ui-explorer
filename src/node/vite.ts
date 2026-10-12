@@ -264,6 +264,8 @@ export default function uiExplorer(options: UiExplorerOptions = {}): Plugin {
 
     configResolved(config) {
       root = config.root
+      // Without a package.json the project's own folder name stands in (not the folder Vite was started from).
+      project = path.basename(root)
       building = config.command === "build"
       basePrefix = /^\.?\/?$/.test(config.base) || config.base.startsWith(".") ? "" : config.base.replace(/\/+$/, "")
       try {
