@@ -8,7 +8,7 @@ It is for **web apps** (anything a browser can render, built with any framework 
 
 ## What it looks like
 
-These are the real explorer pages, running on [`examples/vanilla-demo`](examples/vanilla-demo): a small billing app in plain HTML, CSS and JavaScript, with no framework. The crawler found its 43 states on its own.
+These are the real explorer pages. The gallery and canvas run on [`examples/vanilla-demo`](examples/vanilla-demo), a small billing app in plain HTML, CSS and JavaScript with no framework, where the crawler found 43 states on its own. The other three come from a larger real-world app, a multi-step hiring flow.
 
 **Gallery.** Every state as a thumbnail, with the source folders on the left. Pick any combination of folders to scope what you see.
 
@@ -18,13 +18,17 @@ These are the real explorer pages, running on [`examples/vanilla-demo`](examples
 
 ![The canvas view: screens as nodes, with labelled arrows showing which control leads to which state](https://raw.githubusercontent.com/danielfransix/web-app-ui-explorer/main/docs/images/canvas.png)
 
-**One screen, enlarged.** Open any state in the live app, with arrow keys to move between states and a link out to the real page.
+**One screen, enlarged.** Open any state from the gallery or canvas. It shows where the state lives in the source tree, steps through the others with the arrow buttons, and has an **Open live UI** button to jump to the real page.
 
-![A single state, the Create invoice dialog, shown large with navigation controls at the top](https://raw.githubusercontent.com/danielfransix/web-app-ui-explorer/main/docs/images/screen.png)
+![A single state, a hiring pipeline stage screen, enlarged over the canvas with its source path, a position counter and next and previous buttons](https://raw.githubusercontent.com/danielfransix/web-app-ui-explorer/main/docs/images/screen.png)
+
+**Live view.** The same state running in the real app inside the explorer, with a bar at the top to go back, reset the state, step to the next one or open it in its own tab.
+
+![The live view of a state: the real app with the explorer's top bar for back, reset, previous, next and open in new tab](https://raw.githubusercontent.com/danielfransix/web-app-ui-explorer/main/docs/images/live.png)
 
 **Floating launcher.** In development, a small button sits at the bottom-left of your app. Click it, or press **Alt + Shift + E**, to open the explorer. Drag it if it covers something; a refresh puts it back.
 
-![The demo app with the round explorer launcher button at the bottom-left of the sidebar](https://raw.githubusercontent.com/danielfransix/web-app-ui-explorer/main/docs/images/launcher.png)
+![The app in development with the round explorer launcher button at the bottom-left of the sidebar](https://raw.githubusercontent.com/danielfransix/web-app-ui-explorer/main/docs/images/launcher.png)
 
 Try it yourself in this repository:
 
