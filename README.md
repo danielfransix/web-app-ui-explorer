@@ -76,6 +76,23 @@ web-app-ui-explorer serve --url http://localhost:3000      # or just: --url 3000
 - A dev server on https with a self-signed certificate needs `--insecure`.
 - To reach it by another name (a hosts entry, a container), add `--allowed-host name`.
 
+### Tested with
+
+Every bundler below runs the same checks (`test/contract.mjs`): the page gets the runtime and still works, the dev server's hot-reload channel stays open through the proxy, a crawl finds every state, thumbnails are captured, a recorded state replays, a source edit changes the revision, and a production build gets a working read-only explorer from `snapshot`. The first three run in `npm test`; the rest run in CI with `npm run test:matrix`.
+
+| Bundler | Version tested | How you use it |
+| --- | --- | --- |
+| Vite | 8.3 | `serve`, or the optional plugin |
+| Create React App | react-scripts 5.0.1 | `serve` |
+| webpack | 5.111 with webpack-dev-server 5.2 | `serve` |
+| Next.js (App Router, Turbopack) | 16.4 | `serve` |
+| Parcel | 2.16 | `serve` |
+| Rsbuild (Rspack) | 1.7 | `serve` |
+| esbuild | 0.27 | `serve` |
+| A dev server with no bundler | Node's own HTTP server | `serve` |
+
+Anything else that serves your app over HTTP should work the same way, but has not been run through the checks: Rspack on its own, Bun, Angular CLI, Expo web, and Vite-based frameworks such as Astro, SvelteKit, Nuxt and React Router. If one fails, [open an issue](https://github.com/danielfransix/web-app-ui-explorer/issues) with the dev server's name and version.
+
 ### Vite: the optional plugin
 
 Vite projects can also run the explorer inside the dev server, on the app's own origin, with nothing extra to start. `init` does this by default when it finds a Vite config (`init --serve` sets up the standalone server instead). By hand:
