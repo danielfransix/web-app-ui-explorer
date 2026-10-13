@@ -745,6 +745,15 @@ async function waitForContent(timeoutMs: number) {
   return false
 }
 
+/** Resolves when every script and stylesheet the page asked for has loaded (or after `timeoutMs`). */
+function loaded(timeoutMs: number): Promise<void> {
+  if (document.readyState === "complete") return Promise.resolve()
+  return new Promise((resolve) => {
+    window.addEventListener("load", () => resolve(), { once: true })
+    rawSetTimeout(resolve, timeoutMs)
+  })
+}
+
 /** Opened as `?__uix=<id>`: fetch the recipe, replay it, and say whether it worked. */
 async function runPreview(id: string) {
   try {
@@ -752,6 +761,8 @@ async function runPreview(id: string) {
     if (!response.ok) throw new Error(`Unknown scenario "${id}"`)
     const scenario = (await response.json()) as { actions?: Action[] }
     if (!(await waitForContent(20_000))) throw new Error("The page stayed empty")
+    // Server-rendered pages show text before their scripts have made the buttons work.
+    await loaded(20_000)
     await settle(200, 3000)
     const result = await replay(scenario.actions ?? [])
     if (!result.ok) throw new Error(result.message)
