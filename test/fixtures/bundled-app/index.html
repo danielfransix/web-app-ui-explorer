@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Bundled demo app</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 0; }
+      nav { display: flex; gap: 8px; padding: 12px; border-bottom: 1px solid #ddd; }
+      main { padding: 24px; }
+      .dialog { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: grid; place-items: center; }
+      .dialog > div { background: white; padding: 24px; border-radius: 8px; min-width: 280px; }
+      [role="listbox"] { border: 1px solid #ccc; padding: 4px; margin-top: 4px; width: 200px; }
+      [role="option"] { padding: 6px; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <nav aria-label="Main">
+      <button id="go-home">Home</button>
+      <button id="go-settings">Settings</button>
+      <button id="go-reports">Reports</button>
+    </nav>
+    <main id="view"></main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

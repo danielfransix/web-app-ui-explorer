@@ -1,6 +1,6 @@
 name: CI
 
-# Type-checks, builds and tests the package: unit tests, the crawler and the full stack
+# Type-checks, builds and tests the package: unit tests, the proxy, the CLI, the crawler and the full stack
 # (plugin, API, crawl, capture, replay) against a framework-free demo app.
 on:
   pull_request:
@@ -21,3 +21,23 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - run: npm test
+
+  # The same contract against real bundlers that have to be downloaded: the explorer's `serve` in front of each
+  # one's own dev server, with nothing configured in the bundler.
+  bundlers:
+    runs-on: ubuntu-latest
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        bundler: [webpack, cra, parcel, rsbuild, next]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm run test:matrix -- ${{ matrix.bundler }}
