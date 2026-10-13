@@ -7,11 +7,19 @@ import { fileURLToPath } from "node:url"
 import ts from "typescript"
 import {
   affectsPreviews,
+  charsetOf,
   computeRevision,
+  defineConfig,
+  detectTool,
   guessSources,
   init,
+  injectIntoHtml,
   listSources,
+  loadConfig,
+  normaliseTarget,
   previewPath,
+  rewriteCookie,
+  rewriteLocation,
 } from "../dist/node/index.js"
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -114,10 +122,106 @@ test("init adds the plugin to a Vite config once and keeps generated files out o
   assert.equal((fs.readFileSync(path.join(root, ".gitignore"), "utf8").match(/\.ui-explorer\//g) ?? []).length, 1)
 })
 
-test("init says what to do when there is no Vite config", () => {
+test("init sets up the standalone server when there is no Vite config", () => {
+  const root = temp()
+  write(root, "package.json", JSON.stringify({ name: "cra-app", scripts: { start: "react-scripts start" }, dependencies: { "react-scripts": "5.0.1" } }, null, 2))
   const lines = []
-  assert.equal(init(temp(), (line) => lines.push(line)), false)
+  assert.equal(init(root, (line) => lines.push(line)), true)
+  // The config points at the tool's usual port, there is an "explorer" script, and generated files stay out of git.
+  const config = fs.readFileSync(path.join(root, "ui-explorer.config.mjs"), "utf8")
+  assert.match(config, /url: "http:\/\/localhost:3000"/)
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"))
+  assert.equal(pkg.scripts.explorer, "web-app-ui-explorer serve")
+  assert.equal(pkg.scripts.start, "react-scripts start")
+  assert.match(fs.readFileSync(path.join(root, ".gitignore"), "utf8"), /^\.ui-explorer\/$/m)
+  assert.match(lines.join("\n"), /npm run explorer/)
+  // Running it again keeps what is there.
+  fs.writeFileSync(path.join(root, "ui-explorer.config.mjs"), 'export default { serve: { url: "http://localhost:9999" } }\n')
+  assert.equal(init(root, () => {}), true)
+  assert.match(fs.readFileSync(path.join(root, "ui-explorer.config.mjs"), "utf8"), /9999/)
+  assert.equal((fs.readFileSync(path.join(root, ".gitignore"), "utf8").match(/\.ui-explorer\//g) ?? []).length, 1)
+})
+
+test("init guesses each bundler's usual dev server port", () => {
+  const cases = [
+    [{ next: "16.0.0" }, "Next.js", 3000],
+    [{ parcel: "2.0.0" }, "Parcel", 1234],
+    [{ "webpack-dev-server": "5.0.0" }, "webpack", 8080],
+    [{ "@angular/cli": "20.0.0" }, "Angular CLI", 4200],
+    [{ "@rsbuild/core": "1.0.0" }, "Rsbuild", 3000],
+    [{}, "your dev server", 3000],
+  ]
+  for (const [dependencies, name, port] of cases) {
+    const root = temp()
+    write(root, "package.json", JSON.stringify({ name: "x", devDependencies: dependencies }))
+    assert.deepEqual(detectTool(root), { name, port })
+  }
+})
+
+test("init can set up the standalone server in a Vite project, and says what to add when it cannot edit the Vite config", () => {
+  const root = temp()
+  write(root, "vite.config.ts", "export default {}\n")
+  write(root, "package.json", JSON.stringify({ name: "v", devDependencies: { vite: "8.0.0" } }))
+  assert.equal(init(root, () => {}, { mode: "serve" }), true)
+  assert.match(fs.readFileSync(path.join(root, "ui-explorer.config.mjs"), "utf8"), /localhost:5173/)
+  assert.equal(fs.readFileSync(path.join(root, "vite.config.ts"), "utf8"), "export default {}\n")
+  const lines = []
+  assert.equal(init(root, (line) => lines.push(line), { mode: "vite" }), false)
   assert.match(lines.join("\n"), /plugins: \[uiExplorer\(\)\]/)
+  assert.equal(init(temp(), () => {}, { mode: "vite" }), false)
+})
+
+// ---- HTML and header rewriting (the proxy) ---------------------------------------------------------------
+
+const TAG = '<script src="/__explorer/runtime.js"></script>'
+
+test("the runtime tag goes first in the head, after a charset declaration", () => {
+  assert.equal(injectIntoHtml("<!doctype html><html><head><title>x</title></head><body></body></html>", TAG), `<!doctype html><html><head>${TAG}<title>x</title></head><body></body></html>`)
+  assert.equal(injectIntoHtml('<html><head><meta charset="utf-8"><title>x</title></head></html>', TAG), `<html><head><meta charset="utf-8">${TAG}<title>x</title></head></html>`)
+  assert.equal(injectIntoHtml('<HEAD data-x="1"><title>x</title></HEAD>', TAG), `<HEAD data-x="1">${TAG}<title>x</title></HEAD>`)
+})
+
+test("a page without a head still gets the tag, and a fragment or a tagged page is left alone", () => {
+  assert.equal(injectIntoHtml("<html><body>hi</body></html>", TAG), `<html><head>${TAG}</head><body>hi</body></html>`)
+  assert.equal(injectIntoHtml("<!doctype html><p>hi</p>", TAG), `<!doctype html>${TAG}<p>hi</p>`)
+  // An htmx-style partial must not receive a script.
+  assert.equal(injectIntoHtml("<div>partial</div>", TAG), "<div>partial</div>")
+  const tagged = `<html><head>${TAG}</head></html>`
+  assert.equal(injectIntoHtml(tagged, TAG), tagged)
+  // Under a base path the tag's address differs, and a page that already has it is still recognised.
+  const based = '<script src="/app/__explorer/runtime.js"></script>'
+  assert.equal(injectIntoHtml(`<html><head>${based}</head></html>`, based), `<html><head>${based}</head></html>`)
+})
+
+test("redirects, cookies and charsets are rewritten for the proxy", () => {
+  assert.equal(rewriteLocation("http://localhost:3000/login?x=1", "http://localhost:3000", "http://127.0.0.1:5199"), "http://127.0.0.1:5199/login?x=1")
+  assert.equal(rewriteLocation("/relative", "http://localhost:3000", "http://127.0.0.1:5199"), "/relative")
+  assert.equal(rewriteLocation("https://elsewhere.test/", "http://localhost:3000", "http://127.0.0.1:5199"), "https://elsewhere.test/")
+  assert.equal(rewriteCookie("sid=1; Path=/; Domain=localhost; HttpOnly", false), "sid=1; Path=/; HttpOnly")
+  assert.equal(rewriteCookie("sid=1; Secure; SameSite=None", false), "sid=1; SameSite=Lax")
+  assert.equal(rewriteCookie("sid=1; Secure; SameSite=None", true), "sid=1; Secure; SameSite=None")
+  assert.equal(charsetOf("text/html; charset=UTF-8"), "utf-8")
+  assert.equal(charsetOf('text/html; charset="iso-8859-1"'), "iso-8859-1")
+  assert.equal(charsetOf("text/html"), undefined)
+})
+
+test("a target given as a bare port or host is understood", () => {
+  assert.equal(normaliseTarget("3000"), "http://localhost:3000")
+  assert.equal(normaliseTarget("localhost:8080"), "http://localhost:8080")
+  assert.equal(normaliseTarget("https://app.test"), "https://app.test")
+})
+
+test("a config file is found, loaded and typed", async () => {
+  const root = temp()
+  assert.deepEqual(await loadConfig(root), { config: {} })
+  write(root, "ui-explorer.config.json", JSON.stringify({ serve: { url: "http://localhost:1" }, deny: ["x"] }))
+  assert.deepEqual((await loadConfig(root)).config, { serve: { url: "http://localhost:1" }, deny: ["x"] })
+  write(root, "ui-explorer.config.mjs", "export default { maxStates: 7 }\n")
+  // The .mjs file wins over .json, and an explicit path wins over both.
+  assert.deepEqual((await loadConfig(root)).config, { maxStates: 7 })
+  assert.deepEqual((await loadConfig(root, "ui-explorer.config.json")).config.deny, ["x"])
+  await assert.rejects(loadConfig(root, "missing.mjs"), /not found/)
+  assert.deepEqual(defineConfig({ startPath: "/a" }), { startPath: "/a" })
 })
 
 // ---- Folder model (client) --------------------------------------------------------------------------------

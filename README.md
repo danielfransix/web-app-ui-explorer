@@ -4,7 +4,7 @@ See every screen and state of a front-end app in one place, without writing a li
 
 Web App UI Explorer opens your running web app in a headless browser and explores it the way a careful tester would. It follows the flow, opens dialogs, tries dropdown choices and submits forms, then records each distinct state as a **scenario**: a name, a starting point and the clicks that reach it. The explorer shows them as a gallery of thumbnails, a flow canvas that connects them, and a source tree that places each state in the file that renders it.
 
-It is for **web apps** (anything a browser can render, built with any framework or none). It is a development tool. By default nothing is added to your production build; if you want teammates to browse the screens on a deployed internal URL, you can opt in to a read-only snapshot (see [Shipping it with a build](#shipping-it-with-a-build)).
+It works with **any bundler**: Vite, Create React App, webpack, Next.js, Parcel, Rsbuild, esbuild, or a hand-written dev server. A small server sits in front of your running dev server, so nothing in your build changes. It is for **web apps** (anything a browser can render, built with any framework or none). It is a development tool. By default nothing is added to your production build; if you want teammates to browse the screens on a deployed internal URL, you can opt in to a read-only snapshot (see [Shipping it with a build](#shipping-it-with-a-build)).
 
 ## What it looks like
 
@@ -41,16 +41,44 @@ npm run demo        # builds the package, then serves the demo app with the expl
 
 ## Install
 
-From the root of your Vite project:
+Add the package to your project (it is on the public npm registry, so no account, token or `.npmrc` is needed), then let `init` set it up:
 
 ```sh
-npx @danielfransix/web-app-ui-explorer init      # adds the Vite plugin and a .gitignore entry
 pnpm add -D @danielfransix/web-app-ui-explorer   # or npm install -D / yarn add -D
+npx web-app-ui-explorer init
+npx playwright install chromium                  # once: the browser used to explore
 ```
 
-The package is on the public npm registry, so no account, token or `.npmrc` is needed. After it is installed, `npx web-app-ui-explorer` runs the local copy (the shorter `ui-explorer` command still works as an alias).
+`init` reads your `package.json` to see which bundler you use. It writes `ui-explorer.config.mjs` with your dev server's usual address, adds an `explorer` script, and keeps `.ui-explorer/` out of git. Then:
 
-`init` edits your Vite config for you. To do it by hand:
+```sh
+npm run dev          # your dev server, as usual (any bundler)
+npm run explorer     # the explorer, in front of it
+```
+
+Open the address `explorer` prints. Your app is there as always, and the explorer is at **`/__explorer/`**: press **Explore**. Exploring takes a few minutes for a typical app. Screens appear as they are found, and thumbnails are captured when it finishes.
+
+Press **Alt + Shift + E** (Option + Shift + E on a Mac) in your app, or use the small draggable button at its bottom-left, to jump to the explorer, and again inside a preview to come back.
+
+Requirements: Node 20+.
+
+### How it works with any bundler
+
+`web-app-ui-explorer serve` is a small server that listens on its own port (5199 by default) and forwards everything to your dev server. It adds one `<script>` tag to your pages, answers `/__explorer/` itself, and tunnels WebSockets, so hot reload keeps working. It does not read or change your bundler's configuration, which is why the same command works for Create React App, webpack, Next.js, Parcel, Rsbuild, esbuild and the rest.
+
+```sh
+web-app-ui-explorer serve --url http://localhost:3000      # or just: --url 3000
+```
+
+- It listens on `127.0.0.1` only, refuses requests addressed to any other host name, and refuses writes started by another website.
+- Your dev server sees itself as the origin of every request. Redirects and cookies are rewritten on the way back.
+- If your dev server is not up yet, add `--wait 60` to wait for it, or just reload once it is. A notice page explains what is happening.
+- A dev server on https with a self-signed certificate needs `--insecure`.
+- To reach it by another name (a hosts entry, a container), add `--allowed-host name`.
+
+### Vite: the optional plugin
+
+Vite projects can also run the explorer inside the dev server, on the app's own origin, with nothing extra to start. `init` does this by default when it finds a Vite config (`init --serve` sets up the standalone server instead). By hand:
 
 ```ts
 // vite.config.ts
@@ -61,11 +89,7 @@ export default defineConfig({
 })
 ```
 
-Start your dev server, open **`/__explorer/`**, and press **Explore**. Exploring takes a few minutes for a typical app. Screens appear as they are found, and thumbnails are captured when it finishes.
-
-Press **Alt + Shift + E** (Option + Shift + E on a Mac) in your app, or use the small draggable button at its bottom-left, to jump to the explorer, and again inside a preview to come back.
-
-Requirements: Node 20+, Vite 5+. Playwright's Chromium is used to explore (`npx playwright install chromium` once).
+The plugin and `serve` share one core and take the same options.
 
 ## What you get
 
@@ -88,8 +112,14 @@ Every recipe starts from a clean page load, so a state can always be reproduced.
 
 ## Options
 
-```ts
-uiExplorer({
+Options live in `ui-explorer.config.mjs` (or `.js`, `.json`, or `.ts` on Node 22.18+) at the project root, and are the same ones the Vite plugin takes. Command-line flags override the file.
+
+```js
+// ui-explorer.config.mjs
+import { defineConfig } from "@danielfransix/web-app-ui-explorer"
+
+export default defineConfig({
+  serve: { url: "http://localhost:3000" }, // the dev server `serve` sits in front of (port, host, wait, insecure, allowedHosts too)
   startPath: "/",                   // where every recipe starts
   sources: ["src"],                 // folders shown in the source explorer
   mode: "merge",                    // "merge" | "auto" (explored only) | "manual" (hand-written only)
@@ -106,14 +136,22 @@ uiExplorer({
 })
 ```
 
+With the Vite plugin the same options go to `uiExplorer({ ... })` and `serve` is not used.
+
 ### Shipping it with a build
 
-By default the explorer exists only on the dev server. Set `static: true` and `vite build` also writes a read-only snapshot to `<outDir>/__explorer/`: the explorer page, one data file per scenario, the runtime that adds the floating button and shortcut, and any thumbnails in `.ui-explorer/thumbnails`. Use it only for **internal** URLs, because anyone who can open the app can then open every screen state.
+By default the explorer exists only next to your dev server. After any bundler's production build, run
+
+```sh
+web-app-ui-explorer snapshot --dir build        # or dist, out ...
+```
+
+and the build folder gains a read-only `__explorer/`: the explorer page, one data file per scenario, the runtime that adds the floating button and shortcut, and any thumbnails in `.ui-explorer/thumbnails`. Every HTML file in the folder gets the runtime tag (pass `--html index.html` to limit that), and running it again replaces the previous copy. In a Vite project you can set `static: true` on the plugin instead and `vite build` does the same. Use it only for **internal** URLs, because anyone who can open the app can then open every screen state.
 
 - There is no server in a build, so **Explore** and **Capture** are hidden. Explore and capture locally, then build.
 - `.ui-explorer/` is usually git-ignored, so a clean CI build has no thumbnails and the gallery shows live previews instead.
 - The app must expose its preview routes in that build, and the app and explorer must share one origin. Hand-written scenarios with a `url` must point at routes that exist in the production build.
-- Apps served under a path prefix work: the plugin reads Vite's `base`.
+- Apps served under a path prefix work: pass `--base /prefix` to `snapshot` (the Vite plugin reads Vite's `base`).
 
 ### Apps behind a login
 
@@ -123,8 +161,8 @@ Save a Playwright storage state once (log in, then `context.storageState({ path:
 
 Exploration is the default, but you can add scenarios for states it cannot reach (for example ones that need specific data) or to give a state a name you prefer.
 
-```ts
-uiExplorer({
+```js
+defineConfig({
   scenarios: [
     {
       id: "invoice-overdue",
@@ -148,10 +186,14 @@ A preview page you render yourself reports back by posting `{ type: "uix:ready",
 ## Command line
 
 ```sh
-web-app-ui-explorer init                          # add the plugin to a Vite project
-web-app-ui-explorer crawl --url http://localhost:5173 --root .
-web-app-ui-explorer capture --url http://localhost:5173
+web-app-ui-explorer init                          # set the project up (config file and "explorer" script, or the Vite plugin)
+web-app-ui-explorer serve --url 3000              # put the explorer in front of your dev server
+web-app-ui-explorer snapshot --dir build          # add a read-only explorer to a production build
+web-app-ui-explorer crawl --url http://localhost:3000 --root .
+web-app-ui-explorer capture --url http://localhost:5199   # the address serve prints
 ```
+
+`crawl` works against any dev server directly. `capture` takes its pictures from the pages the explorer serves, so point it at `serve` (or at a Vite dev server with the plugin).
 
 `crawl --debug` also prints every recipe that fails to replay and saves what each state looked like next to the scenarios file. Run `ui-explorer help` for every option.
 
@@ -163,7 +205,7 @@ Measured on a real 7-step hiring wizard with drawers, dialogs, tabs and dropdown
 
 - It explores single-page apps. A control that triggers a full page load ends the recipe at that step.
 - States that need particular data, permissions, hover, drag and drop, or a long chain of conditions may be missed. Add them as hand-written scenarios.
-- It is a Vite plugin. Other bundlers are not supported.
+- `serve` forwards ordinary HTTP and WebSocket traffic. A dev server that refuses to be reached under another port, or a page with a Content Security Policy that does not allow same-origin scripts, needs a setting changed on your side.
 - Names come from headings and button text, so they are good but not always elegant. Hand-written scenarios override them.
 
 ## Staying up to date
@@ -189,15 +231,17 @@ The package is versioned with semver and published to npm by the release workflo
 ```sh
 pnpm install
 pnpm run build      # runtime, node side and the explorer page
-pnpm test           # unit tests, crawler and full-stack tests on a demo app
+pnpm test           # unit, proxy, CLI and crawler tests, plus Vite, esbuild and plain-Node runs of the whole stack
+pnpm run test:matrix            # on demand: the same contract against webpack, Create React App, Parcel, Rsbuild and Next.js
 ```
 
 ```
 src/runtime   runs inside the explored app: finds elements, replays recipes, fingerprints pages
-src/node      the Vite plugin and API, the crawler, thumbnail capture, source matching, the CLI
-src/client    the explorer page (React, built to dist/client and served by the plugin)
+src/node      the explorer core, the serve proxy and snapshot command, the optional Vite plugin, the crawler,
+              thumbnail capture, source matching, the CLI
+src/client    the explorer page (React, built to dist/client and served by serve or the plugin)
 src/shared    the scenario format and the preview protocol
-test          unit tests, plus end-to-end tests against a framework-free demo app
+test          unit and end-to-end tests; contract.mjs is the check every supported bundler must pass
 ```
 
 The explorer page is built once and served from the package, so it does not depend on your app's React, Tailwind or aliases, and your app does not depend on it.

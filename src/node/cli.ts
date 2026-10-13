@@ -1,22 +1,52 @@
 #!/usr/bin/env node
 import fs from "node:fs"
 import path from "node:path"
+import type { ScenariosFile } from "../shared/types"
 import { capture } from "./capture"
+import { loadConfig, type ExplorerConfig } from "./config"
 import { crawl } from "./crawl"
 import { init } from "./init"
 import { computeRevision } from "./revision"
+import { normaliseTarget, serve } from "./serve"
+import { snapshot } from "./snapshot"
 import { guessSources } from "./sources"
-import type { ScenariosFile } from "../shared/types"
 
 const HELP = `web-app-ui-explorer
 
+Works with any bundler: it sits in front of your running dev server, so nothing in your build changes.
+
 Usage
-  web-app-ui-explorer init                       Add the explorer to a Vite project
+  web-app-ui-explorer init                       Set the project up (adds the Vite plugin, or a config file and "explorer" script)
+  web-app-ui-explorer serve --url <server> ...   Put the explorer in front of your dev server
+  web-app-ui-explorer snapshot --dir <build>     Add a read-only explorer to a production build folder
   web-app-ui-explorer crawl --url <server> ...   Explore the running app and write its scenarios
   web-app-ui-explorer capture --url <server> ... Take thumbnails of the scenarios
 
+Options for init
+  --serve                Set up the standalone server even in a Vite project
+  --vite                 Add the Vite plugin (the default in a Vite project)
+
+Options for serve
+  --url <url>            The dev server, for example http://localhost:3000 (or serve.url in the config file)
+  --port <n>             Port to listen on (default 5199; 0 picks a free one)
+  --host <host>          Interface to listen on (default 127.0.0.1)
+  --wait <seconds>       Wait for the dev server to start answering (default 0)
+  --allowed-host <name>  Accept another Host header (repeatable)
+  --insecure             Accept a self-signed certificate from an https dev server
+  --config <file>        Config file (default ui-explorer.config.mjs, .js, .json or .ts)
+  --root <dir>           Project root (default .)
+  --start <path>         Where every recipe starts (default /)
+  --src <dir>            Source folder to watch and show, relative to the root (repeatable, default src)
+  --deny <regex>         Never click a control whose label matches (repeatable)
+
+Options for snapshot
+  --dir <folder>         The build output, for example build or dist (required)
+  --base <path>          Where the app is hosted, for example /app (default: the domain root)
+  --html <file>          An HTML file in the folder to tag (repeatable; default every .html file)
+  --config <file>, --root <dir>, --src <dir>
+
 Options for crawl
-  --url <url>            Origin of the running dev server (required)
+  --url <url>            Origin of the running dev server, or of serve (required)
   --start <path>         Where every recipe starts (default /)
   --out <file>           Where to write the scenarios (default .ui-explorer/scenarios.json)
   --max-states <n>       Stop after this many states (default 250)
@@ -32,7 +62,7 @@ Options for crawl
   --allow-writes         Let the app send POST/PUT/DELETE requests (blocked by default)
 
 Options for capture
-  --url <url>            Origin of the running dev server (required)
+  --url <url>            Origin the explorer is served from: the serve address, or a Vite dev server with the plugin (required)
   --root <dir>           Project root (default .)
   --dir <dir>            Folder holding scenarios.json and thumbnails (default .ui-explorer)
   --src <dir>            Source folder the revision is computed from (repeatable, default src)
@@ -69,25 +99,76 @@ async function main() {
     return
   }
 
+  const root = path.resolve(one("root") ?? ".")
+
   if (command === "init") {
-    process.exitCode = init(path.resolve(one("root") ?? "."), (line) => console.log(line)) ? 0 : 1
+    const mode = flags.has("serve") ? "serve" : flags.has("vite") ? "vite" : undefined
+    process.exitCode = init(root, (line) => console.log(line), { mode }) ? 0 : 1
     return
   }
 
-  const url = one("url")
-  if (command !== "crawl" && command !== "capture") {
+  if (!["serve", "snapshot", "crawl", "capture"].includes(command)) {
     console.error(`Unknown command: ${command}\n\n${HELP}`)
     process.exit(2)
   }
-  if (!url) {
-    console.error("Missing --url, the address of your running dev server.\n")
+
+  const { config: loaded, file: configFile } = await loadConfig(root, one("config"))
+  const { serve: serveSettings, ...fileOptions } = loaded as ExplorerConfig
+  const sources = flags.get("src") ?? fileOptions.sources
+  const deny = [...(fileOptions.deny ?? []), ...(flags.get("deny") ?? [])]
+
+  if (command === "snapshot") {
+    const dir = one("dir") ?? positional[1]
+    if (!dir) {
+      console.error("Missing --dir, the build folder to add the explorer to.\n")
+      console.log(HELP)
+      process.exit(2)
+    }
+    snapshot({
+      ...fileOptions,
+      sources,
+      dir,
+      root,
+      base: one("base"),
+      html: flags.get("html"),
+      log: (line) => console.log(line),
+    })
+    return
+  }
+
+  const rawUrl = one("url") ?? (command === "serve" || command === "crawl" || command === "capture" ? serveSettings?.url : undefined)
+  if (!rawUrl) {
+    console.error("Missing --url, the address of your running dev server (or serve.url in ui-explorer.config.mjs).\n")
     console.log(HELP)
     process.exit(2)
   }
-  const root = path.resolve(one("root") ?? ".")
+  const url = normaliseTarget(rawUrl)
+
+  if (command === "serve") {
+    if (configFile) console.log(`Using ${path.relative(process.cwd(), configFile) || configFile}`)
+    const running = await serve({
+      ...fileOptions,
+      sources,
+      deny: deny.length ? deny : undefined,
+      startPath: one("start") ?? fileOptions.startPath,
+      target: url,
+      root,
+      port: number("port") ?? serveSettings?.port,
+      host: one("host") ?? serveSettings?.host,
+      wait: number("wait") ?? serveSettings?.wait,
+      insecure: flags.has("insecure") || serveSettings?.insecure,
+      allowedHosts: flags.get("allowed-host") ?? serveSettings?.allowedHosts,
+      log: (line) => console.log(line),
+    })
+    console.log(`\nUI Explorer is running.\n  Your app:  ${running.url}/\n  Explorer:  ${running.url}${running.explorer.route}/\n  Forwarding to ${url}\n\nPress Ctrl+C to stop.`)
+    const stop = () => void running.close().then(() => process.exit(0))
+    process.on("SIGINT", stop)
+    process.on("SIGTERM", stop)
+    return
+  }
 
   if (command === "capture") {
-    const dir = path.resolve(root, one("dir") ?? ".ui-explorer")
+    const dir = path.resolve(root, one("dir") ?? fileOptions.dir ?? ".ui-explorer")
     const file = path.join(dir, "scenarios.json")
     if (!fs.existsSync(file)) {
       console.error(`No scenarios found at ${file}. Run \`web-app-ui-explorer crawl\` first.`)
@@ -99,8 +180,10 @@ async function main() {
       startPath: scenarios.startPath,
       scenarios: scenarios.scenarios,
       outDir: path.join(dir, "thumbnails"),
-      revision: computeRevision(root, flags.get("src")),
+      revision: computeRevision(root, sources),
       concurrency: number("concurrency"),
+      storageState: fileOptions.storageState,
+      blockWrites: !fileOptions.allowWrites,
       log: (line) => console.log(line),
     })
     console.log(
@@ -109,29 +192,30 @@ async function main() {
     return
   }
 
-  const out = path.resolve(one("out") ?? ".ui-explorer/scenarios.json")
+  const out = path.resolve(root, one("out") ?? path.join(fileOptions.dir ?? ".ui-explorer", "scenarios.json"))
+  const startPath = one("start") ?? fileOptions.startPath
   const result = await crawl({
     baseUrl: url,
-    startPath: one("start"),
-    maxStates: number("max-states"),
+    startPath,
+    maxStates: number("max-states") ?? fileOptions.maxStates,
     maxDepth: number("max-depth"),
     concurrency: number("concurrency"),
     timeBudgetMs: number("time-budget") ? number("time-budget")! * 60_000 : undefined,
-    deny: flags.get("deny"),
-    storageState: one("storage-state"),
+    deny: deny.length ? deny : undefined,
+    storageState: one("storage-state") ?? fileOptions.storageState,
     headless: !flags.has("headed"),
-    blockWrites: !flags.has("allow-writes"),
+    blockWrites: !(flags.has("allow-writes") || fileOptions.allowWrites),
     log: (line) => console.log(line),
     debug: flags.has("debug"),
   })
   // Place each state in the source tree by matching what it shows against the code.
-  const sources = guessSources(root, result.scenarios, result.snapshots, flags.get("src"))
-  for (const scenario of result.scenarios) scenario.source = sources[scenario.id]
+  const guessed = guessSources(root, result.scenarios, result.snapshots, sources)
+  for (const scenario of result.scenarios) scenario.source = guessed[scenario.id]
   const file: ScenariosFile = {
     version: 1,
     generatedAt: new Date().toISOString(),
     baseUrl: url,
-    startPath: one("start") ?? "/",
+    startPath: startPath ?? "/",
     stats: result.stats,
     scenarios: result.scenarios,
   }

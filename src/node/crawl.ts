@@ -226,6 +226,9 @@ ${runtime}` })
 
   async function load(page: Page) {
     await page.goto(startUrl, { waitUntil: "domcontentloaded" })
+    // A page rendered on the server shows its text at once, but its buttons do nothing until the scripts have run
+    // and the framework has taken over. Waiting for the load event means every script the page asked for has run.
+    await page.waitForLoadState("load", { timeout: 20_000 })
     await page.waitForFunction(
       () => !!(window as W).__uix && document.body && document.body.innerText.trim().length > 0,
       undefined,
