@@ -27,10 +27,13 @@ The **Viewport** dropdown is available in both the modal and full-page preview:
 | View | CSS viewport size |
 | --- | --- |
 | Fit window (default) | Available preview width and height |
+| Custom width | Enter 1–7680 pixels; height fits the preview area |
 | Widescreen | 1920 × 1080 |
 | Desktop | 1440 × 900 |
 | Tablet | 768 × 1024 |
 | Mobile | 390 × 844 |
+
+**Custom width** lets you enter a whole-number pixel width and press **Apply** or Enter. Invalid values leave the last valid viewport unchanged. The custom width is remembered for the browser session; its height follows the available preview space.
 
 Presets change the iframe's real viewport, so the website's own responsive CSS and media queries apply. A preset larger than the available area scrolls at 100% instead of being scaled down. The selected viewport is retained when changing screens, expanding or returning from full-page view, resetting a screen, and reopening the preview; it is also remembered for the browser session. Resizing does not reload the app or discard in-progress interactions. These are CSS viewport previews, not user-agent, touch, or device-pixel-ratio emulation.
 

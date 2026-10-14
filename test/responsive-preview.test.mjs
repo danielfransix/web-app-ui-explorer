@@ -73,7 +73,12 @@ test("interactive previews use real 1:1 viewports, responsive presets and persis
     const box = await iframe.boundingBox()
     assert.ok(Math.abs(box.width - initial.width) < 1, "one iframe CSS pixel is one explorer CSS pixel")
     assert.equal(await iframe.evaluate((element) => getComputedStyle(element).transform), "none")
-    const identity = initial.identity
+    const alignment = await page.getByRole("combobox", { name: "Preview viewport", exact: true }).evaluate((trigger) => {
+      const middle = (element) => { const box = element.getBoundingClientRect(); return box.y + box.height / 2 }
+      return { trigger: middle(trigger), value: middle(trigger.querySelector(".control-select__value")), icon: middle(trigger.parentElement.querySelector(":scope > svg")), label: middle(document.querySelector(".design-viewport-label")) }
+    })
+    for (const part of ["value", "icon", "label"]) assert.ok(Math.abs(alignment.trigger - alignment[part]) < 1, `${part} is vertically centered with the picker`)
+    let identity = initial.identity
     await frame.getByRole("textbox", { name: "Name", exact: true }).fill("Kept while resizing")
     const beforeArrow = page.url()
     await page.getByRole("combobox", { name: "Preview viewport", exact: true }).focus()
@@ -97,6 +102,52 @@ test("interactive previews use real 1:1 viewports, responsive presets and persis
       assert.equal(await frame.getByRole("textbox", { name: "Name", exact: true }).inputValue(), "Kept while resizing")
       if (process.env.UIX_SCREENSHOT_DIR) await page.screenshot({ path: path.join(process.env.UIX_SCREENSHOT_DIR, `responsive-${label.toLowerCase()}.png`) })
     }
+    await choose(page, "Custom width")
+    const custom = page.getByRole("spinbutton", { name: "Custom viewport width", exact: true })
+    const apply = page.getByRole("button", { name: "Apply", exact: true })
+    for (const [width, breakpoint] of [[550, "mobile"], [850, "tablet"], [1300, "desktop"], [2100, "widescreen"]]) {
+      await custom.fill(String(width))
+      await apply.click()
+      await page.waitForFunction((width) => document.querySelector('.screen-preview-entry:not([hidden]) iframe')?.contentWindow?.innerWidth === width, width)
+      const actual = await metrics(frame)
+      assert.equal(actual.width, width)
+      assert.equal(actual.breakpoint, breakpoint)
+      assert.equal(actual.identity, identity)
+      assert.equal(actual.font, "16px")
+      assert.equal((await iframe.boundingBox()).width, width)
+      assert.equal(await frame.getByRole("textbox", { name: "Name", exact: true }).inputValue(), "Kept while resizing")
+    }
+    for (const invalid of ["", "0", "-20", "7681", "390.5"]) {
+      await custom.fill(invalid)
+      await apply.click()
+      assert.match(await page.getByRole("alert").innerText(), /whole-number width/)
+      assert.equal((await metrics(frame)).width, 2100, "invalid input never resizes or reloads the app")
+    }
+    await custom.fill("875")
+    const customUrl = page.url()
+    await custom.press("ArrowRight")
+    assert.equal(page.url(), customUrl, "custom input owns navigation keys")
+    await custom.press("Enter")
+    await page.waitForFunction(() => document.querySelector('.screen-preview-entry:not([hidden]) iframe')?.contentWindow?.innerWidth === 875)
+    const beforeResizeHeight = (await metrics(frame)).height
+    await page.setViewportSize({ width: 2260, height: 1500 })
+    await page.waitForFunction((height) => document.querySelector('.screen-preview-entry:not([hidden]) iframe')?.contentWindow?.innerHeight > height, beforeResizeHeight)
+    assert.equal((await metrics(frame)).width, 875, "custom width stays fixed while height follows the window")
+    await page.getByRole("button", { name: "Open live UI", exact: true }).click()
+    await page.getByRole("button", { name: "Back to preview", exact: true }).waitFor()
+    assert.equal((await metrics(frame)).width, 875)
+    assert.equal((await metrics(frame)).identity, identity)
+    await page.getByRole("button", { name: "Back to preview", exact: true }).click()
+    await page.getByRole("button", { name: "Close", exact: true }).click()
+    await page.getByRole("button", { name: "Expand Screen 0", exact: true }).click()
+    await frame.locator('html[data-uix-status="ready"]').waitFor()
+    assert.equal((await metrics(frame)).width, 875, "custom width survives closing and reopening")
+    await page.reload()
+    await frame.locator('html[data-uix-status="ready"]').waitFor()
+    assert.equal((await metrics(frame)).width, 875, "custom width survives session reload")
+    await choose(page, "Mobile")
+    identity = (await metrics(frame)).identity
+    await frame.getByRole("textbox", { name: "Name", exact: true }).fill("Kept while resizing")
     await page.getByRole("button", { name: "Open live UI", exact: true }).click()
     await page.getByRole("button", { name: "Back to preview", exact: true }).waitFor()
     assert.match(await page.getByRole("combobox", { name: "Preview viewport", exact: true }).innerText(), /Mobile/)

@@ -274,7 +274,10 @@ test("folder counts match direct membership without confusing similarly named pa
 test("responsive viewport presets are real CSS sizes and invalid session values fall back safely", async () => {
   const source = fs.readFileSync(path.join(here, "../src/client/viewports.ts"), "utf8")
   const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } })
-  const { VIEWPORTS, isViewportPreset } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`)
+  const { VIEWPORTS, isViewportPreset, isCustomWidth } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`)
+  assert.equal(VIEWPORTS.custom.label, "Custom width")
+  for (const width of [1, 390, 1024, 7680]) assert.equal(isCustomWidth(width), true)
+  for (const invalid of [undefined, null, "390", 0, -1, 7681, 390.5, NaN, Infinity, {}]) assert.equal(isCustomWidth(invalid), false)
   assert.equal(VIEWPORTS.fit.size, undefined)
   assert.deepEqual(VIEWPORTS.widescreen.size, { width: 1920, height: 1080 })
   assert.deepEqual(VIEWPORTS.desktop.size, { width: 1440, height: 900 })

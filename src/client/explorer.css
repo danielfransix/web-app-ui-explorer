@@ -82,6 +82,12 @@
 .design-viewport-toolbar { @apply flex shrink-0 flex-wrap items-center gap-2 pb-2 text-xs text-fg-muted; }
 .design-viewport-toolbar .control-select { width: 164px; }
 .design-viewport-toolbar .control { margin-top: 0; height: 32px; }
+.design-viewport-toolbar .control-select { display: flex; align-items: center; }
+.design-viewport-toolbar .control-select > svg { margin-top: 0; }
+.design-viewport-custom { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.design-viewport-custom .design-viewport-width { width: 96px; padding: 0 8px; }
+.design-viewport-custom .ds-button { height: 32px; padding: 0 12px; }
+.design-viewport-error { margin: 0 0 8px; color: var(--color-red-600); font-size: 12px; }
 .design-viewport-dimensions { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .design-viewport-scale { @apply text-fg-subtle; }
 .modal-shell--fullscreen .design-viewport-toolbar { padding: 8px 16px; border-bottom: 1px solid var(--color-border); }

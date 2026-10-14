@@ -1,19 +1,21 @@
-import { useCallback, useRef, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { ArrowLeft } from "@phosphor-icons/react/dist/csr/ArrowLeft"
 import { ArrowRight } from "@phosphor-icons/react/dist/csr/ArrowRight"
 import { ArrowSquareOut } from "@phosphor-icons/react/dist/csr/ArrowSquareOut"
-import { Button, Modal, Select, Tooltip } from "./ui"
+import { Button, Input, Modal, Select, Tooltip } from "./ui"
 import ScreenFrame from "./ScreenFrame"
 import useArrowKeys from "./useArrowKeys"
 import { folderCrumb, scenarioSource } from "./folderModel"
 import type { Scenario } from "../shared/types"
-import { VIEWPORTS, isViewportPreset, type ViewportPreset, type ViewportSize } from "./viewports"
+import { MAX_CUSTOM_WIDTH, MIN_CUSTOM_WIDTH, VIEWPORTS, isCustomWidth, isViewportPreset, type ViewportPreset, type ViewportSize } from "./viewports"
 
 type Props = {
   fullScreen?: boolean
   header?: ReactNode
   revision?: number
   viewport: ViewportPreset
+  customWidth: number
+  onCustomWidthChange: (width: number) => void
   onViewportChange: (viewport: ViewportPreset) => void
   scenario: Scenario
   // The screens that were visible when the preview was expanded, so Previous/Next stay in that set.
@@ -56,6 +58,8 @@ export default function ScreenLightbox({
   header,
   revision,
   viewport,
+  customWidth,
+  onCustomWidthChange,
   onViewportChange,
   siblings,
   onSelect,
@@ -64,7 +68,26 @@ export default function ScreenLightbox({
 }: Props) {
   const stageObserver = useRef<ResizeObserver | null>(null)
   const [available, setAvailable] = useState<ViewportSize>({ width: 0, height: 0 })
-  const size = VIEWPORTS[viewport].size
+  const [widthDraft, setWidthDraft] = useState(String(customWidth))
+  const [widthError, setWidthError] = useState(false)
+  useEffect(() => {
+    setWidthDraft(String(customWidth))
+    setWidthError(false)
+  }, [customWidth, viewport])
+  const applyWidth = () => {
+    const width = widthDraft.trim() === "" ? NaN : Number(widthDraft)
+    if (!isCustomWidth(width)) {
+      setWidthError(true)
+      return
+    }
+    setWidthError(false)
+    setWidthDraft(String(width))
+    onCustomWidthChange(width)
+  }
+  // Custom changes width only. The height follows the available stage minus its device padding.
+  const size = viewport === "custom"
+    ? { width: customWidth, height: Math.max(1, available.height - 32) }
+    : VIEWPORTS[viewport].size
   const dimensions = size ?? available
   // The dialog portal mounts after this component's effects. Attach on the actual node, not in a
   // one-shot parent effect that can run while the portal (and therefore its ref) is still absent.
@@ -142,11 +165,36 @@ export default function ScreenLightbox({
             <option key={value} value={value}>{preset.label}</option>
           ))}
         </Select>
+        {viewport === "custom" && (
+          <form className="design-viewport-custom" onSubmit={(event) => { event.preventDefault(); applyWidth() }} noValidate>
+            <label htmlFor="preview-custom-width">Width</label>
+            <Input
+              id="preview-custom-width"
+              aria-label="Custom viewport width"
+              aria-invalid={widthError}
+              aria-describedby={widthError ? "preview-width-error" : undefined}
+              className="control design-viewport-width"
+              type="number"
+              min={MIN_CUSTOM_WIDTH}
+              max={MAX_CUSTOM_WIDTH}
+              step={1}
+              value={widthDraft}
+              onChange={(event) => { setWidthDraft(event.target.value); setWidthError(false) }}
+            />
+            <span>px</span>
+            <Button type="submit" variant="outline">Apply</Button>
+          </form>
+        )}
         <output className="design-viewport-dimensions" aria-label="Preview viewport dimensions">
           {dimensions.width} × {dimensions.height}
         </output>
         <span className="design-viewport-scale">100%</span>
       </div>
+      {viewport === "custom" && widthError && (
+        <p id="preview-width-error" className="design-viewport-error" role="alert">
+          Enter a whole-number width from {MIN_CUSTOM_WIDTH} to {MAX_CUSTOM_WIDTH} pixels.
+        </p>
+      )}
       <div className="design-lightbox-meta" hidden={fullScreen}>
         <span title={scenarioSource(scenario)}>
           {folderCrumb(scenarioSource(scenario))}

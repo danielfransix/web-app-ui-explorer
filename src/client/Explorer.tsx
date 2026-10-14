@@ -34,7 +34,7 @@ import IssuesPanel, { type Issue } from "./IssuesPanel"
 import { usePreviewIssues } from "./previewIssues"
 import { readSession, writeSession } from "./sessionState"
 import { thumbnailFor } from "./thumbnailCache"
-import { isViewportPreset, type ViewportPreset } from "./viewports"
+import { DEFAULT_CUSTOM_WIDTH, isCustomWidth, isViewportPreset, type ViewportPreset } from "./viewports"
 import {
   buildFolderTree,
   folderCounts,
@@ -134,6 +134,13 @@ function Loaded({ data }: { data: ExplorerState }) {
   useEffect(() => {
     writeSession("preview-viewport", viewport)
   }, [viewport])
+  const [customWidth, setCustomWidth] = useState(() => {
+    const saved = readSession("preview-custom-width")
+    return isCustomWidth(saved) ? saved : DEFAULT_CUSTOM_WIDTH
+  })
+  useEffect(() => {
+    writeSession("preview-custom-width", customWidth)
+  }, [customWidth])
   const [infoOpen, setInfoOpen] = useState(false)
   const [issuesOpen, setIssuesOpen] = useState(false)
   const liveIssues = usePreviewIssues()
@@ -596,6 +603,8 @@ function Loaded({ data }: { data: ExplorerState }) {
           header={liveHeader}
           revision={revision}
           viewport={viewport}
+          customWidth={customWidth}
+          onCustomWidthChange={setCustomWidth}
           onViewportChange={setViewport}
           siblings={filtered}
           onSelect={setExpandedId}
