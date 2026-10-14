@@ -20,9 +20,13 @@ These are the real explorer pages. The gallery and canvas run on [`examples/vani
 
 **One screen, enlarged.** Open any state from the gallery or canvas. The preview is interactive: click buttons, type into fields, open menus and scroll the real app directly inside the modal. It shows where the state lives in the source tree and steps through the others with the arrow buttons. Small gallery and canvas thumbnails remain click-to-expand previews.
 
+The preview modal fills the window with a 16px margin on every edge. Its interactive canvas uses the available width and height, with scrolling inside the preview rather than a capped, letterboxed screen.
+
 ![A single state, a hiring pipeline stage screen, enlarged over the canvas with its source path, a position counter and next and previous buttons](https://raw.githubusercontent.com/danielfransix/web-app-ui-explorer/main/docs/images/screen.png)
 
 **Live view.** Choose **Open live UI** to expand the same running preview to full-screen without reloading it. The bar at the top lets you go back, reset the state, step to the next one or return to the app. **Back to preview** restores the modal; closing it returns to the gallery or canvas with your search, selected folders, scroll position and canvas zoom intact. Browser Back and Forward also traverse the preview layers. A direct full-screen link returns safely to the gallery when there is no originating modal.
+
+Up to three visited screens stay in memory while the preview is open, so going back to a recent screen does not reload its app or discard your edits. Older screens are released. **Reset state**, a source revision change, or closing the preview clears this cache. Initial recipe previews wait for scripts, styles and hydration, but not unrelated images or media. Custom preview hosts that only set `data-uix-status` are also detected immediately, without waiting for the timeout.
 
 ![The live view of a state: the real app with the explorer's top bar for back, reset, previous, next and open in new tab](https://raw.githubusercontent.com/danielfransix/web-app-ui-explorer/main/docs/images/live.png)
 

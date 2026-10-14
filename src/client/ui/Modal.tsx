@@ -36,7 +36,7 @@ export default function Modal({
         }
       }}
     >
-      <Dialog.Portal className={`modal-layer modal-layer--${variant}`}>
+      <Dialog.Portal className={`modal-layer modal-layer--${variant}${size === "expanded" ? " modal-layer--expanded" : ""}`}>
         <Dialog.Backdrop
           forceRender
           render={<Button />}

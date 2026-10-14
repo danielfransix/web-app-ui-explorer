@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react"
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { ArrowLeft } from "@phosphor-icons/react/dist/csr/ArrowLeft"
 import { ArrowCounterClockwise } from "@phosphor-icons/react/dist/csr/ArrowCounterClockwise"
 import { ArrowRight } from "@phosphor-icons/react/dist/csr/ArrowRight"
@@ -36,6 +36,7 @@ import { readSession, writeSession } from "./sessionState"
 import { thumbnailFor } from "./thumbnailCache"
 import {
   buildFolderTree,
+  folderCounts,
   folderCrumb,
   pathSelected,
   scenarioFolder,
@@ -141,6 +142,7 @@ function Loaded({ data }: { data: ExplorerState }) {
       : []
   })
   const folderTree = useMemo(() => buildFolderTree(data.sources, scenarios), [data.sources, scenarios])
+  const counts = useMemo(() => folderCounts(scenarios), [scenarios])
   // Which folders are expanded is part of the browsing position, so it lives here (not in the tree
   // component) and is kept for the browser session.
   const [expanded, setExpanded] = useState<string[]>(() => {
@@ -208,11 +210,11 @@ function Loaded({ data }: { data: ExplorerState }) {
     // `data` changes whenever captures do, which is when these counts can change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered, liveIssues, data])
-  const updateQuery = (params: URLSearchParams, replace = false, state: object = {}) => {
+  const updateQuery = useCallback((params: URLSearchParams, replace = false, state: object = {}) => {
     history[replace ? "replaceState" : "pushState"](state, "", `${location.pathname}?${params}`)
     setQuery(params)
-  }
-  const setExpandedId = (id?: string) => {
+  }, [])
+  const setExpandedId = useCallback((id?: string) => {
     const params = new URLSearchParams(location.search)
     if (id) params.set("preview", id)
     else params.delete("preview")
@@ -222,7 +224,7 @@ function Loaded({ data }: { data: ExplorerState }) {
     }
     const ownsPreview = id && (!expandedId || history.state?.uixLayer === "preview")
     updateQuery(params, Boolean(expandedId) || !id, ownsPreview ? { uixLayer: "preview" } : {})
-  }
+  }, [expandedId, updateQuery])
   const navigate = (view: View, id?: string) => {
     const leaving = readView(new URLSearchParams(location.search))
     setIssuesOpen(false)
@@ -435,9 +437,7 @@ function Loaded({ data }: { data: ExplorerState }) {
           onClear={() => setFolders([])}
           collapsed={sidebarCollapsed}
           onCollapsedChange={setSidebarCollapsed}
-          count={(path) =>
-            scenarios.filter((s) => scenarioFolder(s) === path || scenarioFolder(s).startsWith(`${path}/`)).length
-          }
+          count={(path) => counts.get(path) ?? 0}
         />
         <div className="design-workbench-content">
           <div className="design-workbench-toolbar">
@@ -582,6 +582,7 @@ function Loaded({ data }: { data: ExplorerState }) {
       {workbench}
       {previewScenario && (
         <ScreenLightbox
+          key={data.revision}
           scenario={previewScenario}
           fullScreen={fullScreen}
           header={liveHeader}

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 import { ArrowLeft } from "@phosphor-icons/react/dist/csr/ArrowLeft"
 import { ArrowRight } from "@phosphor-icons/react/dist/csr/ArrowRight"
 import { ArrowSquareOut } from "@phosphor-icons/react/dist/csr/ArrowSquareOut"
@@ -18,6 +18,32 @@ type Props = {
   onSelect: (id: string) => void
   onClose: () => void
   onOpenLive: (id: string) => void
+}
+
+// Keep at most three visited screens for this open preview session. Going back is immediate and
+// preserves edits, but browsing a large project cannot leave an unbounded number of apps in memory.
+// Reset state remounts the deck; closing the dialog releases every frame.
+function PreviewDeck({ scenario, enlarged }: { scenario: Scenario; enlarged: boolean }) {
+  const [cache, setCache] = useState({ entries: [scenario], recent: [scenario.id] })
+  if (cache.recent[cache.recent.length - 1] !== scenario.id) {
+    const existing = cache.entries.some((item) => item.id === scenario.id)
+    const entries = existing
+      ? cache.entries
+      : cache.entries.length < 3
+        ? [...cache.entries, scenario]
+        : cache.entries.map((item) => item.id === cache.recent[0] ? scenario : item)
+    // Recency is separate from DOM order: moving an iframe's DOM node reloads its document.
+    setCache({ entries, recent: [...cache.recent.filter((id) => id !== scenario.id).slice(-2), scenario.id] })
+  }
+  return (
+    <div className="screen-preview-deck">
+      {cache.entries.map((item) => (
+        <div className="screen-preview-entry" key={item.id} hidden={item.id !== scenario.id} inert={item.id !== scenario.id}>
+          <ScreenFrame scenario={item.id === scenario.id ? scenario : item} enlarged={enlarged} />
+        </div>
+      ))}
+    </div>
+  )
 }
 
 // Both preview sizes share one frame so expanding and returning never reloads the live app.
@@ -91,7 +117,7 @@ export default function ScreenLightbox({
         )}
       </div>
       <div className="design-lightbox-stage">
-        <ScreenFrame scenario={scenario} enlarged={!fullScreen} revision={revision} />
+        <PreviewDeck key={revision} scenario={scenario} enlarged={!fullScreen} />
       </div>
       <p className="modal-description pb-1" hidden={fullScreen}>{scenario.description}</p>
     </Modal>

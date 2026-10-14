@@ -210,9 +210,11 @@ function Canvas(props: CanvasProps) {
       })
       .then((graph) => {
         if (!active) return
+        const positions = new Map(graph.children?.map((node) => [node.id, node]))
+        const routes = new Map(graph.edges?.map((edge) => [edge.id, edge]))
         setNodes(
           scenarios.map((s) => {
-            const positioned = graph.children?.find((node) => node.id === s.id)
+            const positioned = positions.get(s.id)
             return {
               id: s.id,
               type: "screen",
@@ -225,7 +227,7 @@ function Canvas(props: CanvasProps) {
         )
         setEdges(
           connections.flatMap((edge, i) => {
-            const routed = graph.edges?.find((item) => item.id === `edge-${i}`)
+            const routed = routes.get(`edge-${i}`)
             const section = routed?.sections?.[0]
             if (!section) return []
             const placed = routed?.labels?.[0]

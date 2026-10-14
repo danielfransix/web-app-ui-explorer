@@ -255,3 +255,18 @@ test("folders are named for people", async () => {
   assert.equal(folderLabel("hiring-pipeline"), "Hiring pipeline")
   assert.equal(folderCrumb("web-app/src/screens/RoleDetails.tsx"), "Web app › Screens › Role details")
 })
+
+test("folder counts match direct membership without confusing similarly named paths", async () => {
+  const { folderCounts, scenarioFolder } = await loadFolderModel()
+  const scenarios = [
+    { id: "a", group: "g", source: "app/src/Home.tsx" },
+    { id: "b", group: "g", source: "app/src/Home.tsx", parent: "a" },
+    { id: "c", group: "g", source: "app/src/Home.tsx-extra" },
+  ]
+  const counts = folderCounts(scenarios)
+  assert.equal(counts.get("app/src/Home.tsx"), 2)
+  for (const [path, count] of counts) {
+    assert.equal(count, scenarios.filter((s) => scenarioFolder(s) === path || scenarioFolder(s).startsWith(`${path}/`)).length)
+  }
+  assert.equal(folderCounts([]).size, 0)
+})

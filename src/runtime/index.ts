@@ -162,6 +162,17 @@ const previewId = new URLSearchParams(location.search).get(PREVIEW_PARAM)
 const ALREADY = !!window.__uix
 const ACTIVE = !ALREADY && (previewId !== null || (window as unknown as { __UIX_FORCE?: boolean }).__UIX_FORCE === true)
 if (ACTIVE) trackWork()
+// The injected runtime precedes the host's scripts. Track completed async scripts/styles so preview
+// readiness can wait for hydration without also waiting for unrelated images or embedded media.
+const completedResources = new WeakSet<EventTarget>()
+if (ACTIVE) {
+  const completed = (event: Event) => {
+    if (event.target instanceof HTMLScriptElement || event.target instanceof HTMLLinkElement)
+      completedResources.add(event.target)
+  }
+  document.addEventListener("load", completed, true)
+  document.addEventListener("error", completed, true)
+}
 
 function runningAnimations() {
   // Endless animations (spinners, shimmer) are decoration, not a screen that is still changing.
@@ -745,12 +756,34 @@ async function waitForContent(timeoutMs: number) {
   return false
 }
 
-/** Resolves when every script and stylesheet the page asked for has loaded (or after `timeoutMs`). */
+/** Wait for the parser, scripts and styles, not images/media that do not gate interaction. */
 function loaded(timeoutMs: number): Promise<void> {
   if (document.readyState === "complete") return Promise.resolve()
   return new Promise((resolve) => {
-    window.addEventListener("load", () => resolve(), { once: true })
-    rawSetTimeout(resolve, timeoutMs)
+    let timeout: number
+    const done = () => {
+      window.clearTimeout(timeout)
+      document.removeEventListener("DOMContentLoaded", check)
+      document.removeEventListener("load", check, true)
+      document.removeEventListener("error", check, true)
+      resolve()
+    }
+    const check = () => {
+      if (document.readyState === "loading") return
+      const pendingScript = Array.from(document.scripts).some((script) =>
+        script.src && script.async && !completedResources.has(script) &&
+        (!script.type || /^(module|(?:text|application)\/(?:java|ecma)script)$/i.test(script.type)),
+      )
+      const pendingStyle = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'))
+        .some((link) => !link.disabled && !link.sheet && !completedResources.has(link) &&
+          (!link.media || matchMedia(link.media).matches))
+      if (!pendingScript && !pendingStyle) done()
+    }
+    document.addEventListener("DOMContentLoaded", check)
+    document.addEventListener("load", check, true)
+    document.addEventListener("error", check, true)
+    timeout = rawSetTimeout(done, timeoutMs)
+    check()
   })
 }
 

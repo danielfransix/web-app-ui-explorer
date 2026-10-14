@@ -45,16 +45,39 @@ const subscribe = (listener: () => void) => {
   }
 }
 
+let refreshing = false
+let refreshAgain = false
+// Burst events share a request, with one trailing refresh so changes during a request are not lost.
+// This also prevents slower, older responses from overwriting a newer state.
 async function refresh() {
+  if (refreshing) {
+    refreshAgain = true
+    return
+  }
+  refreshing = true
   try {
     const response = await fetch(isStatic ? "api/state.json" : "api/state", { cache: "no-store" })
     if (!response.ok) throw new Error(`The explorer server answered ${response.status}`)
-    state = (await response.json()) as ExplorerState
+    const next = (await response.json()) as ExplorerState
+    // Job/capture updates do not change the screen catalog. Preserve these references so memoized
+    // cards and the folder tree do not rebuild for every progress event.
+    if (state) {
+      for (const key of ["scenarios", "transitions", "sources", "thumbnails"] as const) {
+        if (JSON.stringify(state[key]) === JSON.stringify(next[key]))
+          Object.assign(next, { [key]: state[key] })
+      }
+    }
+    state = next
     failure = null
   } catch (error) {
     failure = error instanceof Error ? error.message : "The explorer server is not reachable"
   }
   notify()
+  refreshing = false
+  if (refreshAgain) {
+    refreshAgain = false
+    void refresh()
+  }
 }
 
 let connected = false
@@ -72,6 +95,7 @@ export function connect() {
     }
     if (!state) return
     state = { ...state, jobs: { ...state.jobs, [name]: job } }
+    if (refreshing) refreshAgain = true
     notify()
   })
 }
@@ -79,6 +103,11 @@ export function connect() {
 export const getState = () => state
 export const useExplorerState = () => useSyncExternalStore(subscribe, () => state)
 export const useExplorerFailure = () => useSyncExternalStore(subscribe, () => failure)
+// Cards care about capture/source changes, not each crawler progress tick.
+export function useThumbnailUpdates() {
+  useSyncExternalStore(subscribe, () => state?.thumbnails)
+  useSyncExternalStore(subscribe, () => state?.revision)
+}
 
 const call = (path: string, method: "POST" | "DELETE", body?: unknown) =>
   fetch(path, {

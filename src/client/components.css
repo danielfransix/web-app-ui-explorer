@@ -162,8 +162,16 @@ button:focus-visible {
 .modal-shell--center {
   @apply max-h-full w-full max-w-110;
 }
+.modal-layer--expanded {
+  padding: 16px;
+}
 .modal-shell--expanded {
-  @apply max-w-6xl;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+}
+.modal-shell--expanded .modal-master-body {
+  flex: 1;
 }
 .modal-shell--side {
   @apply absolute inset-y-1 right-1 w-full max-w-[calc(100%-var(--spacing)*2)] lg:w-150;

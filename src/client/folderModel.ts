@@ -56,6 +56,18 @@ export function scenarioFolder(scenario: Scenario) {
     scenario.parent ? "States and overlays" : "Base screens"
   }`
 }
+// Count each ancestor once per scenario instead of scanning the entire catalog for every tree row.
+export function folderCounts(scenarios: Scenario[]) {
+  const counts = new Map<string, number>()
+  for (const scenario of scenarios) {
+    const segments = scenarioFolder(scenario).split("/")
+    for (let index = 1; index <= segments.length; index++) {
+      const path = segments.slice(0, index).join("/")
+      counts.set(path, (counts.get(path) ?? 0) + 1)
+    }
+  }
+  return counts
+}
 export function buildFolderTree(sources: string[], scenarios: Scenario[]) {
   const root: FolderNode = {
     path: "",
