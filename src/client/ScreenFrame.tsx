@@ -14,7 +14,7 @@ import { thumbnailFor } from "./thumbnailCache"
 type Props = {
   scenario: Scenario
   compact?: boolean
-  // A larger, non-interactive live view of the same scaled 1280x900 canvas used by thumbnails. It
+  // A larger, interactive live view of the same scaled 1280x900 canvas used by thumbnails. It
   // always renders live, so it never uses a cached capture and never competes for the thumbnail budget.
   enlarged?: boolean
   revision?: number
@@ -124,9 +124,9 @@ function LiveScreenFrame({
           title={`${title} preview`}
           src={previewPath(scenario, getState()?.startPath ?? "/")}
           loading={budgeted ? "lazy" : "eager"}
-          tabIndex={scaled ? -1 : 0}
+          tabIndex={compact ? -1 : 0}
           aria-hidden={compact || undefined}
-          className={scaled ? "screen-thumbnail__frame" : "screen-live-frame"}
+          className={scaled ? `screen-thumbnail__frame${enlarged ? " screen-thumbnail__frame--interactive" : ""}` : "screen-live-frame"}
           style={scaled ? { transform: `scale(${scale})` } : undefined}
         />
       )}

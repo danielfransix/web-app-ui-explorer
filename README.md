@@ -18,11 +18,11 @@ These are the real explorer pages. The gallery and canvas run on [`examples/vani
 
 ![The canvas view: screens as nodes, with labelled arrows showing which control leads to which state](https://raw.githubusercontent.com/danielfransix/web-app-ui-explorer/main/docs/images/canvas.png)
 
-**One screen, enlarged.** Open any state from the gallery or canvas. It shows where the state lives in the source tree, steps through the others with the arrow buttons, and has an **Open live UI** button to jump to the real page.
+**One screen, enlarged.** Open any state from the gallery or canvas. The preview is interactive: click buttons, type into fields, open menus and scroll the real app directly inside the modal. It shows where the state lives in the source tree and steps through the others with the arrow buttons. Small gallery and canvas thumbnails remain click-to-expand previews.
 
 ![A single state, a hiring pipeline stage screen, enlarged over the canvas with its source path, a position counter and next and previous buttons](https://raw.githubusercontent.com/danielfransix/web-app-ui-explorer/main/docs/images/screen.png)
 
-**Live view.** The same state running in the real app inside the explorer, with a bar at the top to go back, reset the state, step to the next one or open it in its own tab.
+**Live view.** Choose **Open live UI** to expand the same running preview to full-screen without reloading it. The bar at the top lets you go back, reset the state, step to the next one or return to the app. **Back to preview** restores the modal; closing it returns to the gallery or canvas with your search, selected folders, scroll position and canvas zoom intact. Browser Back and Forward also traverse the preview layers. A direct full-screen link returns safely to the gallery when there is no originating modal.
 
 ![The live view of a state: the real app with the explorer's top bar for back, reset, previous, next and open in new tab](https://raw.githubusercontent.com/danielfransix/web-app-ui-explorer/main/docs/images/live.png)
 

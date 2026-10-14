@@ -7,7 +7,8 @@ type ModalProps = {
   open: boolean
   title: string
   variant?: "side" | "center"
-  size?: "default" | "expanded"
+  size?: "default" | "expanded" | "fullscreen"
+  header?: ReactNode
   onClose: () => void
   footer?: ReactNode
   children: ReactNode
@@ -20,6 +21,7 @@ export default function Modal({
   size = "default",
   onClose,
   footer,
+  header,
   children,
 }: ModalProps) {
   const titleId = useId()
@@ -48,22 +50,29 @@ export default function Modal({
           tabIndex={-1}
           aria-modal="true"
           aria-labelledby={titleId}
-          className={`modal-shell modal-shell--${variant}${size === "expanded" ? " modal-shell--expanded" : ""}`}
+          className={`modal-shell modal-shell--${variant}${size === "expanded" ? " modal-shell--expanded" : size === "fullscreen" ? " modal-shell--fullscreen" : ""}`}
         >
-          <header className="modal-master-header">
-            <div className="modal-header-copy">
-              <Dialog.Title id={titleId} className="modal-header-title">
-                {title}
-              </Dialog.Title>
-            </div>
-            <Dialog.Close
-              render={
-                <Button className="drawer-close" aria-label="Close">
-                  <X size={20} aria-hidden="true" />
-                </Button>
-              }
-            />
-          </header>
+          {header ? (
+            <>
+              <Dialog.Title id={titleId} className="sr-only">{title}</Dialog.Title>
+              {header}
+            </>
+          ) : (
+            <header className="modal-master-header">
+              <div className="modal-header-copy">
+                <Dialog.Title id={titleId} className="modal-header-title">
+                  {title}
+                </Dialog.Title>
+              </div>
+              <Dialog.Close
+                render={
+                  <Button className="drawer-close" aria-label="Close">
+                    <X size={20} aria-hidden="true" />
+                  </Button>
+                }
+              />
+            </header>
+          )}
           <div className="modal-master-body">{children}</div>
           {footer && <footer className="modal-master-footer">{footer}</footer>}
         </Dialog.Popup>

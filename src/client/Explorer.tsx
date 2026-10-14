@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { lazy, Suspense, useEffect, useMemo, useState } from "react"
 import { ArrowLeft } from "@phosphor-icons/react/dist/csr/ArrowLeft"
 import { ArrowCounterClockwise } from "@phosphor-icons/react/dist/csr/ArrowCounterClockwise"
 import { ArrowRight } from "@phosphor-icons/react/dist/csr/ArrowRight"
@@ -50,6 +50,16 @@ type View = "gallery" | "canvas" | "screen"
 const readView = (query: URLSearchParams): View => {
   const view = query.get("view")
   return view === "canvas" || view === "screen" ? view : "gallery"
+}
+
+// The Navigation API traverses the explorer's entries, skipping history created inside its iframe.
+// Older browsers return locally without depending on the iframe's joint session history.
+function backLayer(fallback: () => void) {
+  const navigation = (window as Window & {
+    navigation?: { back(): { finished: Promise<unknown> } }
+  }).navigation
+  if (navigation) void navigation.back().finished.catch(fallback)
+  else fallback()
 }
 
 function JobStatus({ state }: { state: ExplorerState }) {
@@ -116,7 +126,6 @@ function Loaded({ data }: { data: ExplorerState }) {
   const [search, setSearch] = useState("")
   const [revision, setRevision] = useState(0)
   const [infoOpen, setInfoOpen] = useState(false)
-  const [expandedId, setExpandedId] = useState<string>()
   const [issuesOpen, setIssuesOpen] = useState(false)
   const liveIssues = usePreviewIssues()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => readSession("sidebar-collapsed") === true)
@@ -133,7 +142,7 @@ function Loaded({ data }: { data: ExplorerState }) {
   })
   const folderTree = useMemo(() => buildFolderTree(data.sources, scenarios), [data.sources, scenarios])
   // Which folders are expanded is part of the browsing position, so it lives here (not in the tree
-  // component, which is unmounted while a preview is open) and is kept for the browser session.
+  // component) and is kept for the browser session.
   const [expanded, setExpanded] = useState<string[]>(() => {
     const saved = readSession("expanded")
     if (Array.isArray(saved) && saved.every((path) => typeof path === "string")) return saved
@@ -152,8 +161,6 @@ function Loaded({ data }: { data: ExplorerState }) {
   useEffect(() => {
     writeSession("expanded", expanded)
   }, [expanded])
-  // Where each list view was scrolled when a screen was opened, so returning lands in the same place.
-  const position = useRef<Record<string, { page: number; tree: number }>>({})
   const selectedScenarios = useMemo(
     () => scenarios.filter((s) => pathSelected(scenarioFolder(s), folders)),
     [folders, scenarios],
@@ -161,10 +168,13 @@ function Loaded({ data }: { data: ExplorerState }) {
   useEffect(() => {
     writeSession("folders", folders)
   }, [folders])
-  const mode = readView(query)
+  const fullScreen = readView(query) === "screen"
+  // The workbench stays mounted behind both preview sizes (including the canvas viewport).
+  const mode = fullScreen ? (query.get("returnView") === "canvas" ? "canvas" : "gallery") : readView(query)
+  const expandedId = query.get("preview") ?? undefined
   const selected = scenarios.find((s) => s.id === query.get("scenario"))
   const expandedScenario = scenarios.find((s) => s.id === expandedId)
-  const screenIndex = mode === "screen" && selected ? scenarios.indexOf(selected) : -1
+  const screenIndex = fullScreen && selected ? scenarios.indexOf(selected) : -1
   // On the full-size preview page, Left and Right step through the screens like the arrow buttons.
   useArrowKeys({
     onPrevious: screenIndex > 0 ? () => navigate("screen", scenarios[screenIndex - 1].id) : undefined,
@@ -198,40 +208,61 @@ function Loaded({ data }: { data: ExplorerState }) {
     // `data` changes whenever captures do, which is when these counts can change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered, liveIssues, data])
+  const updateQuery = (params: URLSearchParams, replace = false, state: object = {}) => {
+    history[replace ? "replaceState" : "pushState"](state, "", `${location.pathname}?${params}`)
+    setQuery(params)
+  }
+  const setExpandedId = (id?: string) => {
+    const params = new URLSearchParams(location.search)
+    if (id) params.set("preview", id)
+    else params.delete("preview")
+    if (!id && history.state?.uixLayer === "preview") {
+      backLayer(() => updateQuery(params, true))
+      return
+    }
+    const ownsPreview = id && (!expandedId || history.state?.uixLayer === "preview")
+    updateQuery(params, Boolean(expandedId) || !id, ownsPreview ? { uixLayer: "preview" } : {})
+  }
   const navigate = (view: View, id?: string) => {
     const leaving = readView(new URLSearchParams(location.search))
-    if (view === "screen" && leaving !== "screen")
-      position.current[leaving] = {
-        page: window.scrollY,
-        tree: document.querySelector(".design-folder-tree")?.scrollTop ?? 0,
-      }
-    setExpandedId(undefined)
     setIssuesOpen(false)
     const params = new URLSearchParams()
     params.set("view", view)
     if (id) params.set("scenario", id)
-    history.pushState(null, "", `${location.pathname}?${params}`)
-    setQuery(params)
+    if (view === "screen") {
+      params.set("returnView", mode)
+      if (expandedId) params.set("preview", expandedId)
+    }
+    // Stepping through full-size screens replaces the top layer, rather than adding Back stops.
+    updateQuery(
+      params,
+      view === "screen" && leaving === "screen",
+      view === "screen" ? { uixLayer: "screen" } : {},
+    )
+  }
+  const returnFromLive = () => {
+    const params = new URLSearchParams({ view: mode })
+    if (expandedId) params.set("preview", expandedId)
+    const fallback = () => updateQuery(params, true)
+    if (history.state?.uixLayer === "screen") backLayer(fallback)
+    // Direct links and refreshed pages still have a safe, local return destination.
+    else fallback()
   }
   const returnToUI = () => {
     location.href = data.startPath
   }
-  useLayoutEffect(() => {
-    if (mode === "screen") return
-    const saved = position.current[mode]
-    if (!saved) return
-    delete position.current[mode]
-    window.scrollTo(0, saved.page)
-    const tree = document.querySelector(".design-folder-tree")
-    if (tree) tree.scrollTop = saved.tree
-  }, [mode])
   useEffect(() => {
-    document.title = mode === "screen" && selected ? `${selected.title} · UI Explorer` : "UI Explorer"
-  }, [mode, selected])
+    document.title = fullScreen && selected ? `${selected.title} · UI Explorer` : "UI Explorer"
+  }, [fullScreen, selected])
   useEffect(() => {
+    const restoration = history.scrollRestoration
+    history.scrollRestoration = "manual"
     const pop = () => setQuery(new URLSearchParams(location.search))
     window.addEventListener("popstate", pop)
-    return () => window.removeEventListener("popstate", pop)
+    return () => {
+      history.scrollRestoration = restoration
+      window.removeEventListener("popstate", pop)
+    }
   }, [])
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
@@ -262,71 +293,65 @@ function Loaded({ data }: { data: ExplorerState }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  if (mode === "screen" && selected) {
-    const index = scenarios.indexOf(selected)
-    return (
-      <div className="design-preview-shell">
-        <header className="design-preview-bar">
-          <Tooltip label="All screens" side="bottom">
-            <Button variant="outline" size="icon" aria-label="All screens" onClick={() => navigate("gallery")}>
-              <ArrowLeft size={16} />
-            </Button>
-          </Tooltip>
-          <div className="design-preview-picker">
-            <Select
-              aria-label="Jump to a screen state"
-              value={selected.id}
-              onChange={(event) => navigate("screen", event.target.value)}
-            >
-              <option value="">Choose a screen state</option>
-              {scenarios.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {`${s.group} · ${s.title}`}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <Tooltip label="Reset state" side="bottom">
-            <Button variant="outline" size="icon" aria-label="Reset state" onClick={() => setRevision((value) => value + 1)}>
-              <ArrowCounterClockwise size={16} />
-            </Button>
-          </Tooltip>
-          <Tooltip label="Previous (←)" side="bottom">
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Previous screen state"
-              disabled={index === 0}
-              onClick={() => navigate("screen", scenarios[index - 1].id)}
-            >
-              <ArrowLeft size={16} />
-            </Button>
-          </Tooltip>
-          <Tooltip label="Next (→)" side="bottom">
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Next screen state"
-              disabled={index === scenarios.length - 1}
-              onClick={() => navigate("screen", scenarios[index + 1].id)}
-            >
-              <ArrowRight size={16} />
-            </Button>
-          </Tooltip>
-          <Tooltip label="Return to UI" side="bottom">
-            <Button variant="outline" size="icon" aria-label="Return to UI" onClick={returnToUI}>
-              <ArrowSquareOut size={16} />
-            </Button>
-          </Tooltip>
-        </header>
-        <ScreenFrame scenario={selected} revision={revision} />
+  const liveHeader = fullScreen && selected ? (
+    <header className="design-preview-bar">
+      <Tooltip label={expandedId ? "Back to preview" : "All screens"} side="bottom">
+        <Button variant="outline" size="icon" aria-label={expandedId ? "Back to preview" : "All screens"} onClick={returnFromLive}>
+          <ArrowLeft size={16} />
+        </Button>
+      </Tooltip>
+      <div className="design-preview-picker">
+        <Select
+          aria-label="Jump to a screen state"
+          value={selected.id}
+          onChange={(event) => navigate("screen", event.target.value)}
+        >
+          <option value="">Choose a screen state</option>
+          {scenarios.map((s) => (
+            <option key={s.id} value={s.id}>
+              {`${s.group} · ${s.title}`}
+            </option>
+          ))}
+        </Select>
       </div>
-    )
-  }
+      <Tooltip label="Reset state" side="bottom">
+        <Button variant="outline" size="icon" aria-label="Reset state" onClick={() => setRevision((value) => value + 1)}>
+          <ArrowCounterClockwise size={16} />
+        </Button>
+      </Tooltip>
+      <Tooltip label="Previous (←)" side="bottom">
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label="Previous screen state"
+          disabled={screenIndex === 0}
+          onClick={() => navigate("screen", scenarios[screenIndex - 1].id)}
+        >
+          <ArrowLeft size={16} />
+        </Button>
+      </Tooltip>
+      <Tooltip label="Next (→)" side="bottom">
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label="Next screen state"
+          disabled={screenIndex === scenarios.length - 1}
+          onClick={() => navigate("screen", scenarios[screenIndex + 1].id)}
+        >
+          <ArrowRight size={16} />
+        </Button>
+      </Tooltip>
+      <Tooltip label="Return to UI" side="bottom">
+        <Button variant="outline" size="icon" aria-label="Return to UI" onClick={returnToUI}>
+          <ArrowSquareOut size={16} />
+        </Button>
+      </Tooltip>
+    </header>
+  ) : undefined
 
   const exploring = data.jobs.crawl.status === "running"
   const nothingYet = scenarios.length === 0
-  return (
+  const workbench = (
     <main className="design-workbench">
       <header className="design-workbench-header">
         <div className="flex items-center gap-3">
@@ -549,16 +574,25 @@ function Loaded({ data }: { data: ExplorerState }) {
           onOpenLive={(id) => navigate("screen", id)}
         />
       )}
-      {expandedScenario && (
+    </main>
+  )
+  const previewScenario = fullScreen ? selected : expandedScenario
+  return (
+    <>
+      {workbench}
+      {previewScenario && (
         <ScreenLightbox
-          scenario={expandedScenario}
+          scenario={previewScenario}
+          fullScreen={fullScreen}
+          header={liveHeader}
+          revision={revision}
           siblings={filtered}
           onSelect={setExpandedId}
-          onClose={() => setExpandedId(undefined)}
+          onClose={() => (fullScreen ? returnFromLive() : setExpandedId(undefined))}
           onOpenLive={(id) => navigate("screen", id)}
         />
       )}
-    </main>
+    </>
   )
 }
 

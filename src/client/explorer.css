@@ -110,3 +110,11 @@
 .design-job--error { @apply text-danger; }
 .design-loading { @apply flex min-h-screen items-center justify-center text-sm text-fg-subtle; }
 .design-origin { @apply mt-4 flex gap-1; }
+
+/* Only the small cards are non-interactive; the modal is a usable, scaled live app. */
+.screen-thumbnail__frame--interactive { pointer-events: auto; }
+/* The same dialog and iframe grow to fill the viewport without being re-created. */
+.modal-shell--fullscreen { position: fixed; inset: 0; width: 100%; max-width: none; height: 100dvh; max-height: none; border: 0; border-radius: 0; transform: none; }
+.modal-shell--fullscreen .modal-master-body { display: flex; flex: 1; min-height: 0; flex-direction: column; padding: 0; gap: 0; overflow: hidden; }
+.modal-shell--fullscreen .design-lightbox-stage { display: flex; flex: 1; min-height: 0; max-width: none; width: 100%; margin: 0; border: 0; border-radius: 0; }
+.design-lightbox-meta[hidden], .modal-description[hidden] { display: none; }
