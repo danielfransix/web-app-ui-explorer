@@ -2,7 +2,7 @@ import { useEffect } from "react"
 
 // Controls that use the arrow keys themselves keep them: text entry, sliders, radio groups, tabs, menus.
 const OWNS_ARROWS =
-  'input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="slider"], [role="radiogroup"], [role="radio"], [role="tablist"], [role="tab"], [role="listbox"], [role="menu"], [role="spinbutton"]'
+  'input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="combobox"], [role="option"], [role="slider"], [role="radiogroup"], [role="radio"], [role="tablist"], [role="tab"], [role="listbox"], [role="menu"], [role="spinbutton"]'
 
 // Left and Right do what the previous/next buttons do. Pass undefined for an end that is not available.
 export default function useArrowKeys({

@@ -49,7 +49,6 @@
 .design-screen-card__path { @apply min-w-0 truncate text-2xs leading-4 text-fg-muted; }
 .design-screen-card__meta { @apply mt-1 flex min-h-6 items-center justify-between gap-2; }
 .screen-thumbnail { @apply relative overflow-hidden bg-canvas; aspect-ratio: 1280 / 900; }
-.screen-thumbnail--enlarged { flex: 1; min-height: 0; aspect-ratio: auto; }
 .screen-thumbnail__frame { position: absolute; width: 1280px; height: 900px; border: 0; transform-origin: top left; pointer-events: none; }
 .screen-thumbnail__image { @apply block size-full object-cover object-top; }
 .screen-thumbnail__loading { @apply absolute inset-0 flex items-center justify-center gap-2 bg-canvas-subtle text-xs text-fg-muted; }
@@ -77,10 +76,19 @@
 .design-lightbox-stage { @apply mx-auto flex min-h-0 w-full flex-1 overflow-hidden rounded-lg border border-border bg-canvas; }
 .screen-preview-deck, .screen-preview-entry { display: flex; flex: 1; min-width: 0; min-height: 0; flex-direction: column; }
 .screen-preview-entry[hidden] { display: none; }
+.screen-preview-entry { overflow: hidden; }
+.screen-preview-entry[data-device="true"] { display: block; overflow: auto; padding: 16px; background: var(--color-canvas-subtle); }
+.screen-preview-entry[data-device="true"][hidden] { display: none; }
+.design-viewport-toolbar { @apply flex shrink-0 flex-wrap items-center gap-2 pb-2 text-xs text-fg-muted; }
+.design-viewport-toolbar .control-select { width: 164px; }
+.design-viewport-toolbar .control { margin-top: 0; height: 32px; }
+.design-viewport-dimensions { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.design-viewport-scale { @apply text-fg-subtle; }
+.modal-shell--fullscreen .design-viewport-toolbar { padding: 8px 16px; border-bottom: 1px solid var(--color-border); }
 .design-lightbox-meta { @apply flex min-w-0 flex-wrap items-center justify-between gap-3 text-xs text-fg-subtle; }
 .design-lightbox-actions { @apply flex flex-wrap items-center justify-end gap-3; }
-.screen-live-viewport { @apply relative min-h-0 flex-1; }
-.screen-live-frame { @apply h-full w-full border-0; }
+.screen-live-viewport { @apply relative min-h-0 min-w-0 flex-1 bg-canvas; }
+.screen-live-frame { @apply block h-full w-full border-0; }
 .preview-recipe-error { @apply fixed left-4 top-4 z-50 max-w-lg rounded-lg border border-red-200 bg-canvas p-3 text-sm text-red-600 shadow-lg; }
 .design-flow-canvas { @apply relative mx-8 mb-8 overflow-hidden rounded-xl border border-border bg-canvas-subtle; height: max(560px, calc(100dvh - 280px)); }
 .design-flow-node { @apply h-full overflow-hidden rounded-[7.2px] border border-border bg-canvas shadow-sm; width: 336px; height: 284px; }
@@ -115,7 +123,6 @@
 .design-origin { @apply mt-4 flex gap-1; }
 
 /* Only the small cards are non-interactive; the modal is a usable, scaled live app. */
-.screen-thumbnail__frame--interactive { pointer-events: auto; }
 /* The same dialog and iframe grow to fill the viewport without being re-created. */
 .modal-shell--fullscreen { position: fixed; inset: 0; width: 100%; max-width: none; height: 100dvh; max-height: none; border: 0; border-radius: 0; transform: none; }
 .modal-shell--fullscreen .modal-master-body { display: flex; flex: 1; min-height: 0; flex-direction: column; padding: 0; gap: 0; overflow: hidden; }

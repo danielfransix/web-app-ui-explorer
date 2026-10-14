@@ -1,17 +1,20 @@
-import { useState, type ReactNode } from "react"
+import { useCallback, useRef, useState, type ReactNode } from "react"
 import { ArrowLeft } from "@phosphor-icons/react/dist/csr/ArrowLeft"
 import { ArrowRight } from "@phosphor-icons/react/dist/csr/ArrowRight"
 import { ArrowSquareOut } from "@phosphor-icons/react/dist/csr/ArrowSquareOut"
-import { Button, Modal, Tooltip } from "./ui"
+import { Button, Modal, Select, Tooltip } from "./ui"
 import ScreenFrame from "./ScreenFrame"
 import useArrowKeys from "./useArrowKeys"
 import { folderCrumb, scenarioSource } from "./folderModel"
 import type { Scenario } from "../shared/types"
+import { VIEWPORTS, isViewportPreset, type ViewportPreset, type ViewportSize } from "./viewports"
 
 type Props = {
   fullScreen?: boolean
   header?: ReactNode
   revision?: number
+  viewport: ViewportPreset
+  onViewportChange: (viewport: ViewportPreset) => void
   scenario: Scenario
   // The screens that were visible when the preview was expanded, so Previous/Next stay in that set.
   siblings: Scenario[]
@@ -23,7 +26,7 @@ type Props = {
 // Keep at most three visited screens for this open preview session. Going back is immediate and
 // preserves edits, but browsing a large project cannot leave an unbounded number of apps in memory.
 // Reset state remounts the deck; closing the dialog releases every frame.
-function PreviewDeck({ scenario, enlarged }: { scenario: Scenario; enlarged: boolean }) {
+function PreviewDeck({ scenario, viewport }: { scenario: Scenario; viewport?: ViewportSize }) {
   const [cache, setCache] = useState({ entries: [scenario], recent: [scenario.id] })
   if (cache.recent[cache.recent.length - 1] !== scenario.id) {
     const existing = cache.entries.some((item) => item.id === scenario.id)
@@ -38,8 +41,8 @@ function PreviewDeck({ scenario, enlarged }: { scenario: Scenario; enlarged: boo
   return (
     <div className="screen-preview-deck">
       {cache.entries.map((item) => (
-        <div className="screen-preview-entry" key={item.id} hidden={item.id !== scenario.id} inert={item.id !== scenario.id}>
-          <ScreenFrame scenario={item.id === scenario.id ? scenario : item} enlarged={enlarged} />
+        <div className="screen-preview-entry" key={item.id} data-device={!!viewport} hidden={item.id !== scenario.id} inert={item.id !== scenario.id}>
+          <ScreenFrame scenario={item.id === scenario.id ? scenario : item} viewport={viewport} />
         </div>
       ))}
     </div>
@@ -52,11 +55,31 @@ export default function ScreenLightbox({
   fullScreen = false,
   header,
   revision,
+  viewport,
+  onViewportChange,
   siblings,
   onSelect,
   onClose,
   onOpenLive,
 }: Props) {
+  const stageObserver = useRef<ResizeObserver | null>(null)
+  const [available, setAvailable] = useState<ViewportSize>({ width: 0, height: 0 })
+  const size = VIEWPORTS[viewport].size
+  const dimensions = size ?? available
+  // The dialog portal mounts after this component's effects. Attach on the actual node, not in a
+  // one-shot parent effect that can run while the portal (and therefore its ref) is still absent.
+  const stage = useCallback((node: HTMLDivElement | null) => {
+    stageObserver.current?.disconnect()
+    stageObserver.current = null
+    if (!node) return
+    const observer = new ResizeObserver(([entry]) => {
+      const width = Math.round(entry.contentRect.width)
+      const height = Math.round(entry.contentRect.height)
+      setAvailable((current) => current.width === width && current.height === height ? current : { width, height })
+    })
+    observer.observe(node)
+    stageObserver.current = observer
+  }, [])
   const index = siblings.findIndex((s) => s.id === scenario.id)
   const previous = index > 0 ? siblings[index - 1] : undefined
   const next =
@@ -106,6 +129,24 @@ export default function ScreenLightbox({
         </div>
       )}
     >
+      <div className="design-viewport-toolbar" role="group" aria-label="Responsive preview controls">
+        <span className="design-viewport-label">Viewport</span>
+        <Select
+          aria-label="Preview viewport"
+          value={viewport}
+          onChange={(event) => {
+            if (isViewportPreset(event.target.value)) onViewportChange(event.target.value)
+          }}
+        >
+          {Object.entries(VIEWPORTS).map(([value, preset]) => (
+            <option key={value} value={value}>{preset.label}</option>
+          ))}
+        </Select>
+        <output className="design-viewport-dimensions" aria-label="Preview viewport dimensions">
+          {dimensions.width} × {dimensions.height}
+        </output>
+        <span className="design-viewport-scale">100%</span>
+      </div>
       <div className="design-lightbox-meta" hidden={fullScreen}>
         <span title={scenarioSource(scenario)}>
           {folderCrumb(scenarioSource(scenario))}
@@ -116,8 +157,8 @@ export default function ScreenLightbox({
           </span>
         )}
       </div>
-      <div className="design-lightbox-stage">
-        <PreviewDeck key={revision} scenario={scenario} enlarged={!fullScreen} />
+      <div className="design-lightbox-stage" ref={stage}>
+        <PreviewDeck key={revision} scenario={scenario} viewport={size} />
       </div>
       <p className="modal-description pb-1" hidden={fullScreen}>{scenario.description}</p>
     </Modal>

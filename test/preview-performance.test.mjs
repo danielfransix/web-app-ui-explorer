@@ -56,7 +56,7 @@ test("attribute-only hosts become interactive promptly; visited previews are reu
       for (const [actual, expected] of [[box.x, 16], [box.y, 16], [box.width, viewport.width - 32], [box.height, viewport.height - 32]])
         assert.ok(Math.abs(actual - expected) < 1, `16px modal margins at ${viewport.width}x${viewport.height}: ${JSON.stringify(box)}`)
       await page.waitForFunction(() => {
-        const root = document.querySelector(".screen-preview-entry:not([hidden]) .screen-thumbnail")
+        const root = document.querySelector(".screen-preview-entry:not([hidden]) .screen-live-viewport")
         const iframe = root?.querySelector("iframe")
         if (!root || !iframe) return false
         const container = root.getBoundingClientRect(), preview = iframe.getBoundingClientRect()

@@ -34,6 +34,7 @@ import IssuesPanel, { type Issue } from "./IssuesPanel"
 import { usePreviewIssues } from "./previewIssues"
 import { readSession, writeSession } from "./sessionState"
 import { thumbnailFor } from "./thumbnailCache"
+import { isViewportPreset, type ViewportPreset } from "./viewports"
 import {
   buildFolderTree,
   folderCounts,
@@ -126,6 +127,13 @@ function Loaded({ data }: { data: ExplorerState }) {
   const [query, setQuery] = useState(() => new URLSearchParams(location.search))
   const [search, setSearch] = useState("")
   const [revision, setRevision] = useState(0)
+  const [viewport, setViewport] = useState<ViewportPreset>(() => {
+    const saved = readSession("preview-viewport")
+    return isViewportPreset(saved) ? saved : "fit"
+  })
+  useEffect(() => {
+    writeSession("preview-viewport", viewport)
+  }, [viewport])
   const [infoOpen, setInfoOpen] = useState(false)
   const [issuesOpen, setIssuesOpen] = useState(false)
   const liveIssues = usePreviewIssues()
@@ -587,6 +595,8 @@ function Loaded({ data }: { data: ExplorerState }) {
           fullScreen={fullScreen}
           header={liveHeader}
           revision={revision}
+          viewport={viewport}
+          onViewportChange={setViewport}
           siblings={filtered}
           onSelect={setExpandedId}
           onClose={() => (fullScreen ? returnFromLive() : setExpandedId(undefined))}

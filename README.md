@@ -20,7 +20,19 @@ These are the real explorer pages. The gallery and canvas run on [`examples/vani
 
 **One screen, enlarged.** Open any state from the gallery or canvas. The preview is interactive: click buttons, type into fields, open menus and scroll the real app directly inside the modal. It shows where the state lives in the source tree and steps through the others with the arrow buttons. Small gallery and canvas thumbnails remain click-to-expand previews.
 
-The preview modal fills the window with a 16px margin on every edge. Its interactive canvas uses the available width and height, with scrolling inside the preview rather than a capped, letterboxed screen.
+The preview modal fills the window with a 16px margin on every edge. **Fit window** gives the website the actual available viewport at normal size: making the window larger provides more layout space, not larger text and controls. Interactive previews are never zoomed or stretched. Only the small, non-interactive gallery and canvas thumbnails use a scaled canvas.
+
+The **Viewport** dropdown is available in both the modal and full-page preview:
+
+| View | CSS viewport size |
+| --- | --- |
+| Fit window (default) | Available preview width and height |
+| Widescreen | 1920 × 1080 |
+| Desktop | 1440 × 900 |
+| Tablet | 768 × 1024 |
+| Mobile | 390 × 844 |
+
+Presets change the iframe's real viewport, so the website's own responsive CSS and media queries apply. A preset larger than the available area scrolls at 100% instead of being scaled down. The selected viewport is retained when changing screens, expanding or returning from full-page view, resetting a screen, and reopening the preview; it is also remembered for the browser session. Resizing does not reload the app or discard in-progress interactions. These are CSS viewport previews, not user-agent, touch, or device-pixel-ratio emulation.
 
 ![A single state, a hiring pipeline stage screen, enlarged over the canvas with its source path, a position counter and next and previous buttons](https://raw.githubusercontent.com/danielfransix/web-app-ui-explorer/main/docs/images/screen.png)
 

@@ -10,29 +10,28 @@ import type { Scenario } from "../shared/types"
 import { getState, useThumbnailUpdates } from "./data"
 import { reportPreviewIssue } from "./previewIssues"
 import { thumbnailFor } from "./thumbnailCache"
+import type { ViewportSize } from "./viewports"
 
 type Props = {
   scenario: Scenario
   compact?: boolean
-  // A larger, interactive live view with a scaled 1280px canvas and a height fitted to the modal. It
-  // always renders live, so it never uses a cached capture and never competes for the thumbnail budget.
-  enlarged?: boolean
+  // Interactive previews are real CSS viewports, never transformed. Only non-interactive thumbnail
+  // cards scale a fixed canvas. A missing size fills the available modal/full-page area.
+  viewport?: ViewportSize
   revision?: number
 }
 
 function LiveScreenFrame({
   scenario,
   compact = false,
-  enlarged = false,
+  viewport,
   revision = 0,
 }: Props) {
   const { id, title } = scenario
-  const scaled = compact || enlarged
-  const budgeted = compact && !enlarged
+  const budgeted = compact
   const root = useRef<HTMLDivElement>(null)
   const frame = useRef<HTMLIFrameElement>(null)
   const [scale, setScale] = useState(0.25)
-  const [frameHeight, setFrameHeight] = useState(900)
   const [ready, setReady] = useState(false)
   const [error, setError] = useState("")
   const [visible, setVisible] = useState(!budgeted)
@@ -69,16 +68,15 @@ function LiveScreenFrame({
     return () => observer.disconnect()
   }, [budgeted])
   useEffect(() => {
-    if (!scaled || !root.current) return
+    if (!compact || !root.current) return
     const observer = new ResizeObserver(([entry]) => {
       if (!entry.contentRect.width) return
       const nextScale = entry.contentRect.width / 1280
       setScale(nextScale)
-      if (enlarged) setFrameHeight(entry.contentRect.height / nextScale)
     })
     observer.observe(root.current)
     return () => observer.disconnect()
-  }, [scaled, enlarged])
+  }, [compact])
   useEffect(() => {
     setReady(false)
     setError("")
@@ -150,7 +148,8 @@ function LiveScreenFrame({
   return (
     <div
       ref={root}
-      className={enlarged ? "screen-thumbnail screen-thumbnail--enlarged" : compact ? "screen-thumbnail" : "screen-live-viewport"}
+      className={compact ? "screen-thumbnail" : "screen-live-viewport"}
+      style={!compact && viewport ? { width: viewport.width, height: viewport.height, flex: "none", marginInline: "auto" } : undefined}
     >
       {mounted && (
         <iframe
@@ -161,8 +160,8 @@ function LiveScreenFrame({
           loading="eager"
           tabIndex={compact ? -1 : 0}
           aria-hidden={compact || undefined}
-          className={scaled ? `screen-thumbnail__frame${enlarged ? " screen-thumbnail__frame--interactive" : ""}` : "screen-live-frame"}
-          style={scaled ? { transform: `scale(${scale})`, height: enlarged ? frameHeight : 900 } : undefined}
+          className={compact ? "screen-thumbnail__frame" : "screen-live-frame"}
+          style={compact ? { transform: `scale(${scale})` } : undefined}
         />
       )}
       {!ready && visible && (
@@ -195,7 +194,7 @@ export default memo(function ScreenFrame(props: Props) {
   // Re-render when captures change, so a card swaps to its image as soon as it exists.
   useThumbnailUpdates()
   const cached =
-    props.compact && !props.enlarged ? thumbnailFor(props.scenario.id) : undefined
+    props.compact ? thumbnailFor(props.scenario.id) : undefined
   if (cached?.state === "fresh") {
     return (
       <div className="screen-thumbnail" data-thumbnail="cached">
