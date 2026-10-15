@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { ArrowLeft } from "@phosphor-icons/react/dist/csr/ArrowLeft"
 import { ArrowRight } from "@phosphor-icons/react/dist/csr/ArrowRight"
 import { ArrowSquareOut } from "@phosphor-icons/react/dist/csr/ArrowSquareOut"
+import { ArrowCounterClockwise } from "@phosphor-icons/react/dist/csr/ArrowCounterClockwise"
+import ScreenPicker from "./ScreenPicker"
 import { Button, Input, Modal, Select, Tooltip } from "./ui"
 import ScreenFrame from "./ScreenFrame"
 import useArrowKeys from "./useArrowKeys"
@@ -21,6 +23,7 @@ type Props = {
   // The screens that were visible when the preview was expanded, so Previous/Next stay in that set.
   siblings: Scenario[]
   onSelect: (id: string) => void
+  onReset: () => void
   onClose: () => void
   onOpenLive: (id: string) => void
 }
@@ -63,6 +66,7 @@ export default function ScreenLightbox({
   onViewportChange,
   siblings,
   onSelect,
+  onReset,
   onClose,
   onOpenLive,
 }: Props) {
@@ -107,6 +111,7 @@ export default function ScreenLightbox({
   const previous = index > 0 ? siblings[index - 1] : undefined
   const next =
     index >= 0 && index < siblings.length - 1 ? siblings[index + 1] : undefined
+  const screens = index >= 0 ? siblings : [scenario, ...siblings]
   useArrowKeys({
     onPrevious: !fullScreen && previous ? () => onSelect(previous.id) : undefined,
     onNext: !fullScreen && next ? () => onSelect(next.id) : undefined,
@@ -153,6 +158,18 @@ export default function ScreenLightbox({
       )}
     >
       <div className="design-viewport-toolbar" role="group" aria-label="Responsive preview controls">
+        {!fullScreen && (
+          <>
+            <div className="design-lightbox-picker">
+              <ScreenPicker screens={screens} value={scenario.id} onSelect={onSelect} />
+            </div>
+            <Tooltip label="Reset state">
+              <Button variant="outline" size="icon" aria-label="Reset state" onClick={onReset}>
+                <ArrowCounterClockwise size={16} />
+              </Button>
+            </Tooltip>
+          </>
+        )}
         <span className="design-viewport-label">Viewport</span>
         <Select
           aria-label="Preview viewport"

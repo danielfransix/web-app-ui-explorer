@@ -41,6 +41,8 @@ Presets change the iframe's real viewport, so the website's own responsive CSS a
 
 **Live view.** Choose **Open live UI** to expand the same running preview to full-screen without reloading it. The bar at the top lets you go back, reset the state, step to the next one or return to the app. **Back to preview** restores the modal; closing it returns to the gallery or canvas with your search, selected folders, scroll position and canvas zoom intact. Browser Back and Forward also traverse the preview layers. A direct full-screen link returns safely to the gallery when there is no originating modal.
 
+**Reset state** is available in both the modal and full-screen preview. It reloads only the active screen's preview state; the viewport, custom width and selected screen are kept. Both views also have a searchable **Jump to a screen state** picker that lists only the screens in the current selection (folders and search). Typing filters the list without changing the selection.
+
 Up to three visited screens stay in memory while the preview is open, so going back to a recent screen does not reload its app or discard your edits. Older screens are released. **Reset state**, a source revision change, or closing the preview clears this cache. Initial recipe previews wait for scripts, styles and hydration, but not unrelated images or media. Custom preview hosts that only set `data-uix-status` are also detected immediately, without waiting for the timeout.
 
 ![The live view of a state: the real app with the explorer's top bar for back, reset, previous, next and open in new tab](https://raw.githubusercontent.com/danielfransix/web-app-ui-explorer/main/docs/images/live.png)

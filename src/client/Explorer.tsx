@@ -15,7 +15,7 @@ import { SpinnerGap } from "@phosphor-icons/react/dist/csr/SpinnerGap"
 import { WarningCircle } from "@phosphor-icons/react/dist/csr/WarningCircle"
 import { X } from "@phosphor-icons/react/dist/csr/X"
 import type { Scenario } from "../shared/types"
-import { Button, ContextPanel, Heading, Input, Select, Tooltip } from "./ui"
+import { Button, ContextPanel, Heading, Input, Tooltip } from "./ui"
 import {
   cancelCapture,
   cancelCrawl,
@@ -28,6 +28,7 @@ import {
 } from "./data"
 import ScreenFrame from "./ScreenFrame"
 import FolderNavigator from "./FolderNavigator"
+import ScreenPicker from "./ScreenPicker"
 import ScreenLightbox from "./ScreenLightbox"
 import useArrowKeys from "./useArrowKeys"
 import IssuesPanel, { type Issue } from "./IssuesPanel"
@@ -191,15 +192,6 @@ function Loaded({ data }: { data: ExplorerState }) {
   const expandedId = query.get("preview") ?? undefined
   const selected = scenarios.find((s) => s.id === query.get("scenario"))
   const expandedScenario = scenarios.find((s) => s.id === expandedId)
-  const screenIndex = fullScreen && selected ? scenarios.indexOf(selected) : -1
-  // On the full-size preview page, Left and Right step through the screens like the arrow buttons.
-  useArrowKeys({
-    onPrevious: screenIndex > 0 ? () => navigate("screen", scenarios[screenIndex - 1].id) : undefined,
-    onNext:
-      screenIndex >= 0 && screenIndex < scenarios.length - 1
-        ? () => navigate("screen", scenarios[screenIndex + 1].id)
-        : undefined,
-  })
   const filtered = useMemo(
     () =>
       selectedScenarios.filter((s) =>
@@ -207,6 +199,22 @@ function Loaded({ data }: { data: ExplorerState }) {
       ),
     [search, selectedScenarios],
   )
+  // Preview browsing stays within the current selection. A screen opened by a direct link that is
+  // not part of it (or with nothing selected) falls back to every screen in the project.
+  const current = fullScreen ? selected : expandedScenario
+  const pool = useMemo(
+    () => (current && filtered.includes(current) ? filtered : scenarios),
+    [filtered, scenarios, current],
+  )
+  const screenIndex = fullScreen && selected ? pool.indexOf(selected) : -1
+  // On the full-size preview page, Left and Right step through the screens like the arrow buttons.
+  useArrowKeys({
+    onPrevious: screenIndex > 0 ? () => navigate("screen", pool[screenIndex - 1].id) : undefined,
+    onNext:
+      screenIndex >= 0 && screenIndex < pool.length - 1
+        ? () => navigate("screen", pool[screenIndex + 1].id)
+        : undefined,
+  })
   const connections = useMemo(() => buildConnections(scenarios, data.transitions), [scenarios, data.transitions])
   const groups = useMemo(() => new Set(scenarios.map((s) => s.group)).size, [scenarios])
   // Failed screens: a live preview that failed to start this session, else a failed saved capture.
@@ -318,18 +326,7 @@ function Loaded({ data }: { data: ExplorerState }) {
         </Button>
       </Tooltip>
       <div className="design-preview-picker">
-        <Select
-          aria-label="Jump to a screen state"
-          value={selected.id}
-          onChange={(event) => navigate("screen", event.target.value)}
-        >
-          <option value="">Choose a screen state</option>
-          {scenarios.map((s) => (
-            <option key={s.id} value={s.id}>
-              {`${s.group} · ${s.title}`}
-            </option>
-          ))}
-        </Select>
+        <ScreenPicker screens={pool} value={selected.id} onSelect={(id) => navigate("screen", id)} />
       </div>
       <Tooltip label="Reset state" side="bottom">
         <Button variant="outline" size="icon" aria-label="Reset state" onClick={() => setRevision((value) => value + 1)}>
@@ -342,7 +339,7 @@ function Loaded({ data }: { data: ExplorerState }) {
           size="icon"
           aria-label="Previous screen state"
           disabled={screenIndex === 0}
-          onClick={() => navigate("screen", scenarios[screenIndex - 1].id)}
+          onClick={() => navigate("screen", pool[screenIndex - 1].id)}
         >
           <ArrowLeft size={16} />
         </Button>
@@ -352,8 +349,8 @@ function Loaded({ data }: { data: ExplorerState }) {
           variant="outline"
           size="icon"
           aria-label="Next screen state"
-          disabled={screenIndex === scenarios.length - 1}
-          onClick={() => navigate("screen", scenarios[screenIndex + 1].id)}
+          disabled={screenIndex === pool.length - 1}
+          onClick={() => navigate("screen", pool[screenIndex + 1].id)}
         >
           <ArrowRight size={16} />
         </Button>
@@ -606,7 +603,8 @@ function Loaded({ data }: { data: ExplorerState }) {
           customWidth={customWidth}
           onCustomWidthChange={setCustomWidth}
           onViewportChange={setViewport}
-          siblings={filtered}
+          siblings={pool}
+          onReset={() => setRevision((value) => value + 1)}
           onSelect={setExpandedId}
           onClose={() => (fullScreen ? returnFromLive() : setExpandedId(undefined))}
           onOpenLive={(id) => navigate("screen", id)}

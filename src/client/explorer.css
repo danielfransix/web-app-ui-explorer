@@ -134,3 +134,9 @@
 .modal-shell--fullscreen .modal-master-body { display: flex; flex: 1; min-height: 0; flex-direction: column; padding: 0; gap: 0; overflow: hidden; }
 .modal-shell--fullscreen .design-lightbox-stage { display: flex; flex: 1; min-height: 0; max-width: none; width: 100%; margin: 0; border: 0; border-radius: 0; }
 .design-lightbox-meta[hidden], .modal-description[hidden] { display: none; }
+
+.design-lightbox-picker { @apply min-w-48 max-w-96 flex-1; }
+.design-lightbox-picker .control-select { width: 100%; }
+.screen-picker__input { @apply truncate; }
+.select-menu__empty { @apply px-3 py-2.5 text-sm text-fg-muted; }
+.select-menu__empty:empty { display: none; }
