@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { ArrowLeft } from "@phosphor-icons/react/dist/csr/ArrowLeft"
+import { CaretRight } from "@phosphor-icons/react/dist/csr/CaretRight"
 import { ArrowRight } from "@phosphor-icons/react/dist/csr/ArrowRight"
 import { ArrowSquareOut } from "@phosphor-icons/react/dist/csr/ArrowSquareOut"
 import { ArrowCounterClockwise } from "@phosphor-icons/react/dist/csr/ArrowCounterClockwise"
@@ -124,6 +125,8 @@ export default function ScreenLightbox({
       title={scenario.title}
       onClose={onClose}
       footer={!fullScreen && (
+        <div className="design-lightbox-footer">
+          <p className="design-lightbox-description">{scenario.description}</p>
         <div className="design-lightbox-actions">
           <Tooltip label="Previous (←)">
             <Button
@@ -155,6 +158,7 @@ export default function ScreenLightbox({
             Open live UI
           </Button>
         </div>
+        </div>
       )}
     >
       <div className="design-viewport-toolbar" role="group" aria-label="Responsive preview controls">
@@ -170,7 +174,7 @@ export default function ScreenLightbox({
             </Tooltip>
           </>
         )}
-        <span className="design-viewport-label">Viewport</span>
+        <span className="design-viewport-divider" aria-hidden="true" />
         <Select
           aria-label="Preview viewport"
           value={viewport}
@@ -202,10 +206,9 @@ export default function ScreenLightbox({
             <Button type="submit" variant="outline">Apply</Button>
           </form>
         )}
-        <output className="design-viewport-dimensions" aria-label="Preview viewport dimensions">
+        <output className="design-viewport-dimensions" aria-label="Preview viewport dimensions" title="Rendered at 100%, never scaled">
           {dimensions.width} × {dimensions.height}
         </output>
-        <span className="design-viewport-scale">100%</span>
       </div>
       {viewport === "custom" && widthError && (
         <p id="preview-width-error" className="design-viewport-error" role="alert">
@@ -213,11 +216,16 @@ export default function ScreenLightbox({
         </p>
       )}
       <div className="design-lightbox-meta" hidden={fullScreen}>
-        <span title={scenarioSource(scenario)}>
-          {folderCrumb(scenarioSource(scenario))}
-        </span>
+        <nav className="design-lightbox-crumbs" aria-label="Screen location" title={scenarioSource(scenario)}>
+          {folderCrumb(scenarioSource(scenario)).split(" › ").map((part, i) => (
+            <span key={i} className="design-lightbox-crumb">
+              {i > 0 && <CaretRight size={10} weight="bold" aria-hidden="true" />}
+              {part}
+            </span>
+          ))}
+        </nav>
         {index >= 0 && siblings.length > 1 && (
-          <span>
+          <span className="design-lightbox-count">
             {index + 1} of {siblings.length}
           </span>
         )}
@@ -225,7 +233,6 @@ export default function ScreenLightbox({
       <div className="design-lightbox-stage" ref={stage}>
         <PreviewDeck key={revision} scenario={scenario} viewport={size} />
       </div>
-      <p className="modal-description pb-1" hidden={fullScreen}>{scenario.description}</p>
     </Modal>
   )
 }

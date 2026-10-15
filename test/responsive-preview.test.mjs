@@ -75,9 +75,11 @@ test("interactive previews use real 1:1 viewports, responsive presets and persis
     assert.equal(await iframe.evaluate((element) => getComputedStyle(element).transform), "none")
     const alignment = await page.getByRole("combobox", { name: "Preview viewport", exact: true }).evaluate((trigger) => {
       const middle = (element) => { const box = element.getBoundingClientRect(); return box.y + box.height / 2 }
-      return { trigger: middle(trigger), value: middle(trigger.querySelector(".control-select__value")), icon: middle(trigger.parentElement.querySelector(":scope > svg")), label: middle(document.querySelector(".design-viewport-label")) }
+      return { trigger: middle(trigger), value: middle(trigger.querySelector(".control-select__value")), icon: middle(trigger.parentElement.querySelector(":scope > svg")) }
     })
-    for (const part of ["value", "icon", "label"]) assert.ok(Math.abs(alignment.trigger - alignment[part]) < 1, `${part} is vertically centered with the picker`)
+    for (const part of ["value", "icon"]) assert.ok(Math.abs(alignment.trigger - alignment[part]) < 1, `${part} is vertically centered with the picker`)
+    const heights = await dialog.locator('.design-viewport-toolbar [role="combobox"], .design-viewport-toolbar button').evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().height)))
+    assert.ok(heights.length >= 3 && heights.every((height) => height === 36), `picker, reset and viewport controls share one height: ${heights}`)
     let identity = initial.identity
     await frame.getByRole("textbox", { name: "Name", exact: true }).fill("Kept while resizing")
     const beforeArrow = page.url()
