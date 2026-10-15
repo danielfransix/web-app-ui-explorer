@@ -10,10 +10,10 @@
   @apply rounded-full border border-border px-3 py-1.5 text-xs text-fg-subtle;
 }
 .design-workbench-metrics {
-  @apply flex items-center gap-4;
+  @apply flex items-center gap-8;
 }
 .design-workbench-metrics div {
-  @apply flex flex-col gap-1 border-l border-border pl-3;
+  @apply flex flex-col gap-1;
 }
 .design-workbench-metrics strong { @apply font-semibold text-2xl; }
 .design-workbench-metrics span { @apply text-xs text-fg-subtle; }
@@ -125,7 +125,7 @@
   .design-workbench-toolbar { @apply flex-wrap; }
   .design-workbench-search { @apply ml-0 flex-1; }
   .design-workbench-search input { @apply w-full; }
-  .design-workbench-metrics { @apply gap-4; }
+  .design-workbench-metrics { @apply gap-6; }
   .design-workbench-badge, .design-shortcut-hint { @apply hidden; }
   .design-workbench-layout { @apply flex-col; }
   /* Stacked layout: the icon sits in a 40px button inset by px-3, so its left edge is 12px + 10px. */

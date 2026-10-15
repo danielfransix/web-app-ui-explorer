@@ -51,6 +51,22 @@ Up to three visited screens stay in memory while the preview is open, so going b
 
 ![The app in development with the round explorer launcher button at the bottom-left of the sidebar](https://raw.githubusercontent.com/danielfransix/web-app-ui-explorer/main/docs/images/launcher.png)
 
+### Keyboard shortcuts
+
+Shortcuts use **Alt + Shift** plus a letter (Option + Shift on a Mac), so they never collide with typing. They are not shown in the interface, except the search hint.
+
+| Shortcut | What it does |
+| --- | --- |
+| **Alt + Shift + E** | Open the explorer from your app, and return from a preview. |
+| **/** or **Ctrl/⌘ + K** | Focus search. **Esc** clears the search, and a second **Esc** leaves the field. |
+| **Alt + Shift + F** | Focus search (works from anywhere in the workbench). |
+| **Alt + Shift + V** | Switch between Gallery and Canvas. |
+| **Alt + Shift + R** | Refresh from your current selection: re-captures the screens in the selected folders and search, or every screen when nothing is selected. Inside a preview it resets that screen's state and refreshes its thumbnail. |
+| **Alt + Shift + X** | Explore the whole app again to find new screens. |
+| **← / →** | Previous or next screen in a preview. |
+
+Refresh and Explore need a running dev server, so they do nothing in a static build.
+
 Try it yourself in this repository:
 
 ```sh

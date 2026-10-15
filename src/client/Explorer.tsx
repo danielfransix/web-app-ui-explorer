@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react"
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ArrowLeft } from "@phosphor-icons/react/dist/csr/ArrowLeft"
 import { ArrowCounterClockwise } from "@phosphor-icons/react/dist/csr/ArrowCounterClockwise"
 import { ArrowRight } from "@phosphor-icons/react/dist/csr/ArrowRight"
@@ -22,6 +22,8 @@ import {
   connections as buildConnections,
   isState,
   startCrawl,
+  startCapture,
+  isStatic,
   useExplorerFailure,
   useExplorerState,
   type ExplorerState,
@@ -363,6 +365,7 @@ function Loaded({ data }: { data: ExplorerState }) {
     </header>
   ) : undefined
 
+  const searchRef = useRef<HTMLInputElement>(null)
   const exploring = data.jobs.crawl.status === "running"
   const nothingYet = scenarios.length === 0
   const workbench = (
@@ -477,8 +480,16 @@ function Loaded({ data }: { data: ExplorerState }) {
               <MagnifyingGlass size={18} />
               <Input
                 aria-label="Search screen states"
-                placeholder="Search"
+                ref={searchRef}
+                placeholder="Search  (press /)"
                 value={search}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.stopPropagation()
+                    if (search) setSearch("")
+                    else event.currentTarget.blur()
+                  }
+                }}
                 onChange={(event) => setSearch(event.target.value)}
               />
             </div>
@@ -589,6 +600,47 @@ function Loaded({ data }: { data: ExplorerState }) {
     </main>
   )
   const previewScenario = fullScreen ? selected : expandedScenario
+  // Keyboard shortcuts read the latest state through a ref, so the listener is attached once.
+  const shortcutState = {
+    previewScenario, filtered, scenarios, mode, exploring, navigate,
+    live: !isStatic, crawl: !isStatic && data.mode !== "manual",
+    reset: () => setRevision((value) => value + 1),
+  }
+  const latest = useRef(shortcutState)
+  latest.current = shortcutState
+  useEffect(() => {
+    const keydown = (event: KeyboardEvent) => {
+      if (event.repeat || event.isComposing) return
+      const now = latest.current
+      const typing = event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')
+      const focusSearch = () => { event.preventDefault(); searchRef.current?.focus(); searchRef.current?.select() }
+      // Search: / (outside a text field) or Ctrl/Cmd + K (anywhere) while the workbench is visible.
+      if (!now.previewScenario && ((event.key === "/" && !typing && !event.altKey && !event.ctrlKey && !event.metaKey) ||
+        ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.code === "KeyK"))) return focusSearch()
+      if (!event.altKey || !event.shiftKey || event.ctrlKey || event.metaKey) return
+      if (event.code === "KeyF" && !now.previewScenario) return focusSearch()
+      if (event.code === "KeyV" && !now.previewScenario) {
+        event.preventDefault()
+        now.navigate(now.mode === "gallery" ? "canvas" : "gallery")
+      } else if (event.code === "KeyR") {
+        event.preventDefault()
+        if (now.previewScenario) {
+          // In a preview: reset the active screen and refresh its thumbnail.
+          now.reset()
+          if (now.live) void startCapture([now.previewScenario.id])
+        } else if (now.live) {
+          // In the workbench: refresh the screens in the current selection (and search), or every screen when nothing is selected.
+          const ids = (now.filtered.length ? now.filtered : now.scenarios).map((s) => s.id)
+          if (ids.length) void startCapture(ids)
+        }
+      } else if (event.code === "KeyX" && now.crawl && !now.exploring) {
+        event.preventDefault()
+        void startCrawl()
+      }
+    }
+    document.addEventListener("keydown", keydown, true)
+    return () => document.removeEventListener("keydown", keydown, true)
+  }, [])
   return (
     <>
       {workbench}
