@@ -6,6 +6,9 @@ import { capture } from "./capture"
 import { loadConfig, type ExplorerConfig } from "./config"
 import { crawl } from "./crawl"
 import { init } from "./init"
+import { installAgentGuidance } from "./agent-guidance"
+import { runMcpServer } from "./mcp"
+import { startBridge } from "./bridge"
 import { computeRevision } from "./revision"
 import { normaliseTarget, serve } from "./serve"
 import { snapshot } from "./snapshot"
@@ -17,10 +20,13 @@ Works with any bundler: it sits in front of your running dev server, so nothing 
 
 Usage
   web-app-ui-explorer init                       Set the project up (adds the Vite plugin, or a config file and "explorer" script)
+  web-app-ui-explorer agents --root <dir>         Add or update orchestration guidance in the project's AGENTS.md
   web-app-ui-explorer serve --url <server> ...   Put the explorer in front of your dev server
   web-app-ui-explorer snapshot --dir <build>     Add a read-only explorer to a production build folder
   web-app-ui-explorer crawl --url <server> ...   Explore the running app and write its scenarios
   web-app-ui-explorer capture --url <server> ... Take thumbnails of the scenarios
+  web-app-ui-explorer mcp --root <dir> ...       Run the MCP server exposing scanned screens to an agent (stdio)
+  web-app-ui-explorer bridge --root <dir>       Connect the companion Figma plugin to MCP (loopback port 5198)
 
 Options for init
   --serve                Set up the standalone server even in a Vite project
@@ -67,6 +73,23 @@ Options for capture
   --dir <dir>            Folder holding scenarios.json and thumbnails (default .ui-explorer)
   --src <dir>            Source folder the revision is computed from (repeatable, default src)
   --concurrency <n>      Browsers working at once (default 4)
+
+Options for mcp
+  --root <dir>           Project root to read scanned screens from (default .)
+  --base-url <url>       The target app's reachable dev server, required for captures and exports
+  --start <path>         Where every recipe starts (default /)
+  --route <path>         Explorer route for discovery (default /__explorer)
+  --storage-state <file> Playwright storage state for authenticated captures
+  --allow-writes         Allow app requests that change data during design capture
+
+Options for bridge
+  --root <dir>           Target app root (connection saved under .ui-explorer, default .)
+  --port <n>             Loopback port (default 5198; custom ports also need a matching plugin manifest domain)
+  --base-url <url>       Running app URL; enables the plugin's local folder and screen-ID imports
+  --start <path>         Where replay recipes start (default /)
+  --route <path>         Explorer catalog route (default /__explorer)
+  --storage-state <file> Playwright storage state for authenticated captures
+  --allow-writes         Allow app requests that change data during capture
 `
 
 function parse(argv: string[]) {
@@ -101,9 +124,27 @@ async function main() {
 
   const root = path.resolve(one("root") ?? ".")
 
+  if (command === "agents") {
+    installAgentGuidance(root, (line) => console.log(line))
+    return
+  }
+
   if (command === "init") {
     const mode = flags.has("serve") ? "serve" : flags.has("vite") ? "vite" : undefined
     process.exitCode = init(root, (line) => console.log(line), { mode }) ? 0 : 1
+    return
+  }
+
+  if (command === "mcp") {
+    await runMcpServer({ root, baseUrl: one("base-url"), startPath: one("start"), route: one("route"), storageState: one("storage-state"), allowWrites: flags.has("allow-writes") })
+    return
+  }
+
+  if (command === "bridge") {
+    const bridge = await startBridge({ root, port: number("port"), baseUrl: one("base-url"), startPath: one("start"), route: one("route"), storageState: one("storage-state"), allowWrites: flags.has("allow-writes") })
+    console.log(`Paste this connection URL into the Figma plugin: ${bridge.url}/#${bridge.token}`)
+    const close = () => { void bridge.close().then(() => process.exit()) }
+    process.once("SIGINT", close); process.once("SIGTERM", close)
     return
   }
 

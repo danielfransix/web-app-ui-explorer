@@ -70,7 +70,7 @@ export default function IssuesPanel({
           {issues.map(({ scenario, kind, reason }) => (
             <li key={scenario.id} className="design-issue">
               <div className="design-issue__head">
-                <strong>{scenario.title}</strong>
+                <h3 className="modal-section-title">{scenario.title}</h3>
                 <span className="design-state-pill">
                   {kind === "live" ? "Preview" : "Capture"}
                 </span>
@@ -99,7 +99,7 @@ export default function IssuesPanel({
       {stale > 0 && !isStatic && (
         <section className="design-issue" aria-label="Out of date captures">
           <div className="design-issue__head">
-            <strong>{stale} out of date</strong>
+            <h3 className="modal-section-title">{stale} out of date</h3>
           </div>
           <Button variant="outline" size="sm" onClick={() => void startCapture()}>
             Capture again

@@ -35,6 +35,7 @@ import { Button, Tooltip } from "./ui"
 import type { Scenario, Transition } from "../shared/types"
 import { folderCrumb, scenarioSource } from "./folderModel"
 import ScreenFrame from "./ScreenFrame"
+import ScreenSelect from "./ScreenSelect"
 import "@xyflow/react/dist/style.css"
 
 const WIDTH = 336
@@ -51,6 +52,7 @@ const LIVE_ZOOM = 0.18
 let elk: InstanceType<typeof ELK> | undefined
 const layoutEngine = () => (elk ??= new ELK({ workerUrl: elkWorkerUrl }))
 const OpenPreview = createContext<(id: string) => void>(() => {})
+const ScreenSelection = createContext<{ ids: ReadonlySet<string>; select: (id: string, checked: boolean) => void }>({ ids: new Set(), select: () => {} })
 type ScreenNodeType = Node<{ scenario: Scenario; crumb: string }, "screen">
 type RoutedEdge = Edge<{
   path: string
@@ -61,6 +63,8 @@ type CanvasProps = {
   scenarios: Scenario[]
   connections: Transition[]
   onOpen: (id: string) => void
+  selectedIds: ReadonlySet<string>
+  onSelect: (id: string, checked: boolean) => void
 }
 
 // Subscribes to a boolean, not the viewport, so a card re-renders when it crosses the threshold rather
@@ -69,10 +73,11 @@ const ScreenNode = memo(function ScreenNode({
   data,
 }: NodeProps<ScreenNodeType>) {
   const open = useContext(OpenPreview)
+  const selection = useContext(ScreenSelection)
   const showPreview = useStore((state) => state.transform[2] >= LIVE_ZOOM)
   const s = data.scenario
   return (
-    <article className="design-flow-node">
+    <article className="design-flow-node" data-selected={selection.ids.has(s.id)}>
       <Handle type="target" position={Position.Left} id="in" />
       <div className="design-screen-card__preview nodrag">
         {showPreview ? (
@@ -90,13 +95,16 @@ const ScreenNode = memo(function ScreenNode({
           onClick={() => open(s.id)}
         />
       </div>
-      <Button
-        className="design-flow-node__title nodrag"
-        title={data.crumb}
-        onClick={() => open(s.id)}
-      >
-        {s.title}
-      </Button>
+      <div className="design-flow-node__caption">
+        <Button
+          className="design-flow-node__title nodrag"
+          title={data.crumb}
+          onClick={() => open(s.id)}
+        >
+          {s.title}
+        </Button>
+        <ScreenSelect title={s.title} checked={selection.ids.has(s.id)} onChange={checked => selection.select(s.id, checked)} />
+      </div>
       <Handle type="source" position={Position.Right} id="out" />
     </article>
   )
@@ -149,6 +157,7 @@ const shortLabel = (label?: string) => (label && label.length > 26 ? `${label.sl
 
 function Canvas(props: CanvasProps) {
   const { scenarios, onOpen } = props
+  const selection = useMemo(() => ({ ids: props.selectedIds, select: props.onSelect }), [props.selectedIds, props.onSelect])
   const [nodes, setNodes, onNodesChange] = useNodesState<ScreenNodeType>([])
   const [edges, setEdges] = useState<RoutedEdge[]>([])
   const [busy, setBusy] = useState(true)
@@ -287,6 +296,7 @@ function Canvas(props: CanvasProps) {
   }, [idKey, setNodes, revision])
   return (
     <OpenPreview.Provider value={onOpen}>
+      <ScreenSelection.Provider value={selection}>
       <section
         className="design-flow-canvas"
         aria-label="Connected screen canvas"
@@ -366,6 +376,7 @@ function Canvas(props: CanvasProps) {
           </div>
         )}
       </section>
+      </ScreenSelection.Provider>
     </OpenPreview.Provider>
   )
 }

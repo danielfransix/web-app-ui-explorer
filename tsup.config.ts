@@ -15,6 +15,7 @@ export default defineConfig([
     clean: false,
     sourcemap: true,
     external: ["playwright", "vite"],
+    loader: { ".md": "text" },
   },
   // Browser side: injected into the host app and into crawler pages. One self-contained script, no imports at runtime.
   {

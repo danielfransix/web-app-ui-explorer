@@ -23,13 +23,21 @@ export default function Select({
   const { container, triggerRef } = usePopupContainer()
   const [local, setLocal] = useState(String(defaultValue ?? ""))
   const current = value === undefined ? local : String(value)
-  const options = Children.toArray(children)
-    .filter(isValidElement<{ value?: string; disabled?: boolean; children?: ReactNode }>)
-    .map((option) => ({
-      value: String(option.props.value ?? option.props.children ?? ""),
-      label: String(option.props.children ?? ""),
-      disabled: option.props.disabled,
-    }))
+  const options: { value: string; label: string; disabled?: boolean; group?: string }[] = []
+  const textContent = (nodes: ReactNode): string => Children.toArray(nodes).map((node) =>
+    isValidElement<{ children?: ReactNode }>(node) ? textContent(node.props.children) : String(node)).join("")
+  function collect(nodes: ReactNode, group?: string, disabled = false) {
+    Children.forEach(nodes, (option) => {
+      if (!isValidElement<{ value?: string; label?: string; disabled?: boolean; children?: ReactNode }>(option)) return
+      if (option.type === "optgroup") {
+        collect(option.props.children, option.props.label, disabled || !!option.props.disabled)
+      } else if (option.type === "option") {
+        options.push({ value: String(option.props.value ?? textContent(option.props.children)),
+          label: textContent(option.props.children), disabled: disabled || option.props.disabled, group })
+      }
+    })
+  }
+  collect(children)
   const items = options.filter((option) => option.value !== "")
   const placeholder = options.find((option) => option.value === "")?.label ?? "Choose an option"
   const selected = items.find((option) => option.value === current)
@@ -69,7 +77,11 @@ export default function Select({
           >
             <BaseSelect.Popup className="select-menu uix-popup">
               <BaseSelect.List>
-                {items.map((option) => (
+                {items.map((option, index) => (
+                  <div key={option.value}>
+                  {option.group && option.group !== items[index - 1]?.group && (
+                    <div className="design-copy-menu__divider">{option.group}</div>
+                  )}
                   <BaseSelect.Item
                     key={option.value}
                     value={option.value}
@@ -83,6 +95,7 @@ export default function Select({
                       <Check size={16} aria-hidden="true" />
                     </BaseSelect.ItemIndicator>
                   </BaseSelect.Item>
+                  </div>
                 ))}
               </BaseSelect.List>
             </BaseSelect.Popup>

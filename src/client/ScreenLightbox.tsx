@@ -4,6 +4,9 @@ import { CaretRight } from "@phosphor-icons/react/dist/csr/CaretRight"
 import { ArrowRight } from "@phosphor-icons/react/dist/csr/ArrowRight"
 import { ArrowSquareOut } from "@phosphor-icons/react/dist/csr/ArrowSquareOut"
 import { ArrowCounterClockwise } from "@phosphor-icons/react/dist/csr/ArrowCounterClockwise"
+import CopyMenu from "./CopyMenu"
+import FigmaExport from "./FigmaExport"
+import { addCustomWidth, useCustomWidths } from "./customWidths"
 import ScreenPicker from "./ScreenPicker"
 import { Button, Input, Modal, Select, Tooltip } from "./ui"
 import ScreenFrame from "./ScreenFrame"
@@ -72,6 +75,7 @@ export default function ScreenLightbox({
   onOpenLive,
 }: Props) {
   const stageObserver = useRef<ResizeObserver | null>(null)
+  const customWidths = useCustomWidths()
   const [available, setAvailable] = useState<ViewportSize>({ width: 0, height: 0 })
   const [widthDraft, setWidthDraft] = useState(String(customWidth))
   const [widthError, setWidthError] = useState(false)
@@ -88,6 +92,7 @@ export default function ScreenLightbox({
     setWidthError(false)
     setWidthDraft(String(width))
     onCustomWidthChange(width)
+    addCustomWidth(`${width}px`, width)
   }
   // Custom changes width only. The height follows the available stage minus its device padding.
   const size = viewport === "custom"
@@ -179,12 +184,27 @@ export default function ScreenLightbox({
           aria-label="Preview viewport"
           value={viewport}
           onChange={(event) => {
-            if (isViewportPreset(event.target.value)) onViewportChange(event.target.value)
+            const value = event.target.value
+            if (isViewportPreset(value)) return onViewportChange(value)
+            const custom = customWidths.find((entry) => `custom:${entry.id}` === value)
+            if (custom) {
+              onViewportChange("custom")
+              onCustomWidthChange(custom.width)
+            }
           }}
         >
-          {Object.entries(VIEWPORTS).map(([value, preset]) => (
-            <option key={value} value={value}>{preset.label}</option>
-          ))}
+          <optgroup label="Presets">
+            {Object.entries(VIEWPORTS).map(([value, preset]) => (
+              <option key={value} value={value}>{preset.label}</option>
+            ))}
+          </optgroup>
+          {customWidths.length > 0 && (
+            <optgroup label="Custom">
+              {customWidths.map((entry) => (
+                <option key={entry.id} value={`custom:${entry.id}`}>{entry.label} ({entry.width}px)</option>
+              ))}
+            </optgroup>
+          )}
         </Select>
         {viewport === "custom" && (
           <form className="design-viewport-custom" onSubmit={(event) => { event.preventDefault(); applyWidth() }} noValidate>
@@ -209,6 +229,8 @@ export default function ScreenLightbox({
         <output className="design-viewport-dimensions" aria-label="Preview viewport dimensions" title="Rendered at 100%, never scaled">
           {dimensions.width} × {dimensions.height}
         </output>
+        <FigmaExport scenarios={[scenario]} />
+        <CopyMenu scenarioId={scenario.id} currentWidth={dimensions.width} />
       </div>
       {viewport === "custom" && widthError && (
         <p id="preview-width-error" className="design-viewport-error" role="alert">

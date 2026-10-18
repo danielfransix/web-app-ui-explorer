@@ -23,7 +23,8 @@ test("keyboard shortcuts: search, view toggle and refresh follow the current sel
     await page.goto(`${base}/__explorer/?view=gallery`)
     await page.getByRole("checkbox").first().click()
     const search = page.getByRole("textbox", { name: "Search screen states" })
-    assert.match(await search.getAttribute("placeholder"), /\//)
+    assert.equal(await search.getAttribute("placeholder"), "Search screens")
+    assert.equal(await page.locator('.design-search-shortcut').innerText(), '/')
 
     await page.locator("body").click({ position: { x: 700, y: 30 } })
     await page.keyboard.press("/")
@@ -51,15 +52,17 @@ test("keyboard shortcuts: search, view toggle and refresh follow the current sel
     await page.keyboard.press("Alt+Shift+KeyV")
     await page.waitForFunction(() => new URLSearchParams(location.search).get("view") === "gallery")
 
-    // Metrics: no leading divider, so the first figure lines up with the heading.
+    // A project with one source keeps its totals inside that source card.
     await page.getByRole("button", { name: "Workspace overview" }).click()
     const lefts = await page.evaluate(() => {
       const first = document.querySelector(".design-workbench-metrics div")
-      const heading = [...document.querySelectorAll("h2")].find((h) => h.textContent === "Workspace overview")
+      const heading = document.querySelector(".design-origin-summary strong")
       return { border: getComputedStyle(first).borderLeftWidth, metric: first.getBoundingClientRect().left, heading: heading.getBoundingClientRect().left }
     })
     assert.equal(lefts.border, "0px")
     assert.ok(Math.abs(lefts.metric - lefts.heading) < 1, JSON.stringify(lefts))
+    const totals = page.getByRole("group", { name: "Registered catalog totals", exact: true })
+    assert.deepEqual(await totals.locator("strong").allTextContents(), ["3", "2", "0"])
     assert.deepEqual(errors, [])
   } finally {
     await browser?.close()

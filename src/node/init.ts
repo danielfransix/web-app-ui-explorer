@@ -1,6 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import { CONFIG_FILES } from "./config"
+import { installAgentGuidance } from "./agent-guidance"
 
 const VITE_CONFIGS = ["vite.config.ts", "vite.config.mts", "vite.config.js", "vite.config.mjs", "vite.config.cjs"]
 const IMPORT = `import uiExplorer from "@danielfransix/web-app-ui-explorer/vite"`
@@ -125,11 +126,13 @@ export function init(root: string, log: (line: string) => void, options: InitOpt
     }
     if (!addVitePlugin(viteConfig, log)) return false
     ignoreGeneratedFiles(root, log)
+    installAgentGuidance(root, log)
     log(`\nNext:\n  1. ${packageManager(root)} @danielfransix/web-app-ui-explorer   (if it is not installed yet)\n  2. Start your dev server and open /__explorer/\n  3. Press Explore. It finds your screens and states by itself.`)
     return true
   }
   setUpServe(root, log)
   ignoreGeneratedFiles(root, log)
+  installAgentGuidance(root, log)
   const run = fs.existsSync(path.join(root, "pnpm-lock.yaml")) ? "pnpm explorer" : fs.existsSync(path.join(root, "yarn.lock")) ? "yarn explorer" : "npm run explorer"
   log(`\nNext:\n  1. ${packageManager(root)} @danielfransix/web-app-ui-explorer   (if it is not installed yet)\n  2. Start your dev server as usual\n  3. In another terminal: ${run}\n  4. Open the address it prints, then /__explorer/, and press Explore.`)
   return true

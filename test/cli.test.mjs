@@ -64,7 +64,7 @@ function startServe(args, options = {}) {
 test("help lists every command, and mistakes exit with a message instead of a stack trace", () => {
   const help = run(["help"])
   assert.equal(help.status, 0)
-  for (const command of ["init", "serve", "snapshot", "crawl", "capture"]) assert.match(help.stdout, new RegExp(`web-app-ui-explorer ${command}`))
+  for (const command of ["init", "agents", "serve", "snapshot", "crawl", "capture"]) assert.match(help.stdout, new RegExp(`web-app-ui-explorer ${command}`))
   assert.match(help.stdout, /any bundler/i)
 
   const unknown = run(["frobnicate"])
@@ -87,6 +87,43 @@ test("help lists every command, and mistakes exit with a message instead of a st
   const badBase = run(["snapshot", "--dir", ".", "--base", "app"], { cwd: temp() })
   assert.equal(badBase.status, 1)
   assert.match(badBase.stderr, /--base must start with a slash/)
+})
+
+test("agents installs portable guidance, preserves project instructions and updates only its owned section", () => {
+  const root = temp()
+  const file = path.join(root, "AGENTS.md")
+  const original = "# Project rules\r\n\r\nKeep our existing instructions.\r\n"
+  fs.writeFileSync(file, original)
+  const first = run(["agents", "--root", root])
+  assert.equal(first.status, 0, first.stderr)
+  const installed = fs.readFileSync(file, "utf8")
+  assert.ok(installed.startsWith(original))
+  const guide = fs.readFileSync(new URL("../docs/agent-orchestration.md", import.meta.url), "utf8").trim()
+  assert.ok(installed.includes(guide.replace(/^#/gm, "##")), "the installed rules match the packaged guide")
+  assert.deepEqual(fs.readdirSync(root), ["AGENTS.md"], "guidance installation does not alter app setup")
+  assert.equal(run(["agents", "--root", root]).status, 0)
+  assert.equal(fs.readFileSync(file, "utf8"), installed, "repeated setup is idempotent")
+
+  const start = "<!-- ui-explorer:orchestration:start -->"
+  const end = "<!-- ui-explorer:orchestration:end -->"
+  const suffix = "\r\n## More project rules\r\nPreserve these too.\r\n"
+  fs.writeFileSync(file, original + start + "\nOld guidance\n" + end + suffix)
+  assert.equal(run(["agents", "--root", root]).status, 0)
+  const updated = fs.readFileSync(file, "utf8")
+  assert.ok(updated.startsWith(original)); assert.ok(updated.endsWith(suffix))
+  assert.ok(updated.includes(guide.replace(/^#/gm, "##")))
+  assert.ok(!updated.includes("Old guidance"))
+
+  for (const malformed of [start, end, end + start, start + end + start + end]) {
+    fs.writeFileSync(file, original + malformed)
+    const result = run(["agents", "--root", root])
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /file was left unchanged/)
+    assert.equal(fs.readFileSync(file, "utf8"), original + malformed)
+  }
+  const empty = temp()
+  assert.equal(run(["agents", "--root", empty]).status, 0)
+  assert.ok(fs.readFileSync(path.join(empty, "AGENTS.md"), "utf8").includes(guide.replace(/^#/gm, "##")))
 })
 
 test("init in a Create React App project, then serve from the config it wrote", { timeout: 60_000 }, async () => {

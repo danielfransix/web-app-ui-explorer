@@ -116,6 +116,7 @@ test("init adds the plugin to a Vite config once and keeps generated files out o
   assert.match(config, /import uiExplorer from "@danielfransix\/web-app-ui-explorer\/vite"/)
   assert.match(config, /plugins: \[\s*uiExplorer\(\),\s*react\(\)\]/)
   assert.match(fs.readFileSync(path.join(root, ".gitignore"), "utf8"), /^\.ui-explorer\/$/m)
+  assert.match(fs.readFileSync(path.join(root, "AGENTS.md"), "utf8"), /UI Explorer and Figma orchestration/)
   // Running it again changes nothing.
   assert.equal(init(root, () => {}), true)
   assert.equal(fs.readFileSync(path.join(root, "vite.config.ts"), "utf8"), config)
@@ -135,6 +136,7 @@ test("init sets up the standalone server when there is no Vite config", () => {
   assert.equal(pkg.scripts.start, "react-scripts start")
   assert.match(fs.readFileSync(path.join(root, ".gitignore"), "utf8"), /^\.ui-explorer\/$/m)
   assert.match(lines.join("\n"), /npm run explorer/)
+  assert.match(fs.readFileSync(path.join(root, "AGENTS.md"), "utf8"), /UI Explorer and Figma orchestration/)
   // Running it again keeps what is there.
   fs.writeFileSync(path.join(root, "ui-explorer.config.mjs"), 'export default { serve: { url: "http://localhost:9999" } }\n')
   assert.equal(init(root, () => {}), true)

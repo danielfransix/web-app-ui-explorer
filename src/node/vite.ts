@@ -44,5 +44,6 @@ export default function uiExplorer(options: UiExplorerOptions = {}): Plugin {
       server.httpServer?.on("close", () => explorer.dispose())
       server.middlewares.use((req, res, next) => void explorer.handle(req, res, next))
     },
+    async closeBundle() { await explorer?.dispose() },
   }
 }

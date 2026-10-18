@@ -112,4 +112,78 @@ export type UixRuntime = {
   popupOptions(): Candidate[]
   autofill(): Promise<AutofillResult>
   resolve(action: Action): Element | null
+  captureDesign(options?: { root?: Element }): DesignNode | null
+}
+
+// ---- Design capture ---------------------------------------------------------------------------------
+// A structured description of a rendered subtree, close enough to Figma's own node model (frames, text,
+// fills, strokes) that it can be rebuilt as real editable layers rather than a flattened picture of one.
+// Deliberately leaves out anything the DOM can't give a straight answer for (gradients, mixed per-side
+// borders, non-uniform corner radii) rather than guessing - those are known, documented limitations of
+// this first pass, not oversights.
+
+export type DesignFill =
+  | { type: "solid"; color: string; /** The CSS custom property this value traced back to, if any. */ token?: string }
+  | { type: "image"; src: string }
+
+export type DesignStroke = { color: string; width: number; token?: string; widths?: { top:number; right:number; bottom:number; left:number } }
+
+export type DesignShadow = { x: number; y: number; blur: number; spread: number; color: string }
+
+export type DesignText = {
+  content: string
+  fontFamily: string
+  fontSize: number
+  fontWeight: number
+  /** In px, or "normal" when the browser reports a keyword rather than a resolved length. */
+  lineHeight: number | "normal"
+  letterSpacing: number | "normal"
+  color: string
+  /** The CSS custom property `color` traced back to, if any. */
+  colorToken?: string
+  align: string
+}
+
+/** Filled in by the component-detection system; absent until that system runs. */
+export type ComponentRef = {
+  /** Stable across runs: derived from sourceFile+name (or framework+name when no file is recoverable). */
+  id: string
+  name: string
+  sourceFile?: string
+  sourceLine?: number
+  framework: "react" | "vue" | "angular" | "web-component" | "svelte" | "astro"
+}
+
+export type DesignNode = {
+  tag: string
+  /** Serialized SVG, kept as editable vectors by the Figma interpreter. */
+  svg?: string
+  /** Assigned by the planner for this exact captured visual variant. */
+  componentVariant?: string
+  /** Relative to the capture root's own top-left corner, not the page. */
+  rect: { x: number; y: number; width: number; height: number }
+  fills: DesignFill[]
+  stroke?: DesignStroke
+  radius?: number
+  shadow?: DesignShadow[]
+  /** Only present below 1 - most nodes are fully opaque. */
+  opacity?: number
+  /** Browser overflow clips descendants to this box. */
+  clipsContent?: boolean
+  /** Actual text layout box, including padding/alignment inside controls, in capture coordinates. */
+  textRect?: { x: number; y: number; width: number; height: number }
+  /** Present on leaf nodes (no element children) that have visible text. */
+  text?: DesignText
+  component?: ComponentRef
+  children: DesignNode[]
+}
+
+/** One width's capture of one scenario - the unit every other system in the Figma export plan addresses. */
+export type DesignCapture = {
+  scenarioId: string
+  width: number
+  height: number
+  capturedAt: string
+  root: DesignNode
+  warnings?: string[]
 }

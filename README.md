@@ -12,6 +12,13 @@ These are the real explorer pages. The gallery and canvas run on [`examples/vani
 
 **Gallery.** Every state as a thumbnail, with the source folders on the left. Pick any combination of folders to scope what you see.
 
+The **Workspace** menu (three dots at the top right) contains workspace totals, discovery, Return to UI,
+and keyboard help. When both screen sources exist, it offers **Registered** (screens/states defined in
+the project's Explorer setup), **Discovered** (states found automatically by exploring the app), or
+**All screens** (the combined catalog). These replace the older Curated, Explored and Both labels.
+**Build in Figma** appears with your selected screens. On mobile, search takes a full row below the
+Gallery/Canvas switch; the keyboard hint is kept separate from its prompt on desktop.
+
 ![The gallery view: a source tree on the left and thumbnails of each discovered screen and state](https://raw.githubusercontent.com/danielfransix/web-app-ui-explorer/main/docs/images/gallery.png)
 
 **Canvas.** The states connected by the control that leads from one to the next. Here, only the navigation and dialog states are selected.
@@ -98,6 +105,8 @@ Open the address `explorer` prints. Your app is there as always, and the explore
 Press **Alt + Shift + E** (Option + Shift + E on a Mac) in your app, or use the small draggable button at its bottom-left, to jump to the explorer, and again inside a preview to come back.
 
 Requirements: Node 20+.
+
+`init` also adds the [Explorer and Figma tool boundaries](docs/agent-orchestration.md) to your project's `AGENTS.md`, preserving its other instructions. Explorer handles source discovery and capture; the importer writes designs; Figma's existing tools handle pages, sections, arrangement, annotations and inspection. The MCP server supplies the same guidance when an agent connects. For an existing setup, run `npx web-app-ui-explorer agents --root .` to add or refresh just this guidance. Installing the dependency alone does not edit project instructions.
 
 ### How it works with any bundler
 
@@ -279,6 +288,37 @@ The package is versioned with semver and published to npm by the release workflo
   ]
 }
 ```
+
+## Export screens to Figma
+
+For local imports, browse folders in UI Explorer and check individual screens beside their titles,
+below the thumbnails. **Select visible** selects the current folder/search results in bulk; uncheck
+any exceptions. Selection is kept across folders, searches and Gallery/Canvas views. Click **Build
+in Figma** (also available in a single-screen preview). Review the screens/states and capture widths, then prepare and copy the short
+import code. Paste it into **UI Explorer design import** in Figma to connect automatically and load
+that exact request. Choose the canvas destination and grid/horizontal arrangement, then build.
+Explorer starts its own bridge on demand; no separate connection command or URL is required. Codes
+last one hour while Explorer remains running and support protected re-imports, progress, cancellation
+and final coverage verification. Source browsing and capture settings stay in Explorer.
+
+Open a screen in the local Explorer and use **Copy** to select several preset or saved custom widths.
+Run the companion **UI Explorer design import** plugin in Figma, choose a destination, and build from
+the clipboard. If Figma restricts browser clipboard access, connect the local bridge below to enable
+that button. A manual paste field is also available. It creates editable frames, vectors, components, instances and
+linked paint/text styles. The built plugin is included under `figma-plugin/` in the npm package; import
+its `manifest.json` through Figma desktop's development-plugin menu.
+
+For MCP clients, open Explorer's workspace menu, then **Figma connection**, and paste its URL into the
+plugin's **Advanced connection**. Configure the client to launch
+`web-app-ui-explorer mcp --root <app-root> --base-url <dev-url>` using the same app root.
+Tools list folders, groups and all scenario kinds, count scenario/width pairs, capture designs, check
+the plugin connection, and export a selected scope with explicit placement. Keep Figma and the plugin
+open during a batch. Existing frames are updated without duplicates, and edit conflicts are reported.
+The plugin separately shows connected MCP clients and import progress. No special trigger is needed
+once the MCP server is enabled and the plugin is connected. See the
+[MCP-to-Figma setup guide](docs/mcp-figma.md) for configuration, tool arguments and troubleshooting.
+
+See [plugin setup](figma-plugin/README.md) and [implementation status and remaining limitations](docs/figma-integration-options.md).
 
 ## Development
 

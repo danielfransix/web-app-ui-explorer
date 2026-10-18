@@ -1,0 +1,14 @@
+{
+  "name": "UI Explorer design import",
+  "id": "uix-design-import",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "networkAccess": {
+    "allowedDomains": ["*"],
+    "reasoning": "Connect to the authenticated local UI Explorer bridge and load source image fills.",
+    "devAllowedDomains": ["http://localhost:5198"]
+  },
+  "documentAccess": "dynamic-page"
+}

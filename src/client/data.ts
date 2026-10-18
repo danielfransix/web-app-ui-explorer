@@ -17,6 +17,7 @@ export type ExplorerState = {
   startPath: string
   route: string
   mode: string
+  capabilities?: { figmaImports?: number }
   revision: string
   generatedAt?: string
   scenarios: Scenario[]

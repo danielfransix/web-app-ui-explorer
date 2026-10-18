@@ -275,7 +275,7 @@ export async function serve(config: ServeOptions): Promise<RunningServe> {
     explorer,
     async close() {
       watcher.close()
-      explorer.dispose()
+      await explorer.dispose()
       agent.destroy()
       for (const socket of sockets) socket.destroy()
       await new Promise<void>((resolve) => server.close(() => resolve()))

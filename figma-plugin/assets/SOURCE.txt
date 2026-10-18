@@ -1,0 +1,4 @@
+Plus Jakarta Sans
+Google Fonts CSS source: https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400..700&display=swap
+License: https://github.com/google/fonts/blob/main/ofl/plusjakartasans/OFL.txt
+Variable regular weights 400-700, downloaded 2026-10-18.

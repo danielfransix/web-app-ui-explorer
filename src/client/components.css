@@ -46,21 +46,19 @@ button:focus-visible {
 .ds-button--variant-ghost {
   @apply bg-transparent text-fg;
 }
-.ds-button--variant-ghost:hover {
-  @apply bg-slate-100;
-}
 .ds-button--variant-ghost-slim,
 .ds-button--variant-link-danger {
-  @apply h-auto bg-transparent p-0 text-fg;
+  @apply h-auto bg-transparent px-1 py-1 text-fg;
 }
+.ds-button--variant-ghost:hover:not(:disabled),
 .ds-button--variant-ghost-slim:hover:not(:disabled) {
-  @apply rounded-sm bg-brand-subtle px-1 text-brand;
+  @apply bg-brand-subtle text-brand;
 }
 .ds-button--variant-link-danger {
   @apply text-danger;
 }
 .ds-button--variant-link-danger:hover:not(:disabled) {
-  @apply rounded-sm bg-red-50 px-1 text-red-600;
+  @apply bg-red-50 text-red-600;
 }
 .ds-button--variant-secondary-2 {
   @apply bg-brand-subtle text-brand;
@@ -121,6 +119,13 @@ button:focus-visible {
 .select-menu__option svg {
   @apply shrink-0 text-brand;
 }
+.multi-select__option { justify-content:flex-start; }
+.multi-select__checkbox { display:grid; place-items:center; width:16px; height:16px; flex:0 0 16px; border:1px solid var(--color-slate-350); border-radius:4px; background:var(--color-canvas); }
+.multi-select__option[aria-selected="true"] .multi-select__checkbox { background:var(--color-brand); border-color:var(--color-brand); }
+.multi-select__checkbox svg { color:var(--color-white); }
+.multi-select__option[aria-disabled="true"] { opacity:.45; cursor:not-allowed; }
+.multi-select__option-label { font-size:13px; line-height:20px; font-weight:500; }
+.multi-select__option-description { font-size:11px; line-height:16px; font-weight:400; color:var(--color-fg-muted); }
 
 /* Popups ------------------------------------------------------------------------------------------------- */
 .uix-popup-positioner,
@@ -147,6 +152,13 @@ button:focus-visible {
 }
 
 /* Dialogs ------------------------------------------------------------------------------------------------ */
+:root {
+  --dialog-title-size:18px;
+  --dialog-section-size:15px;
+  --dialog-body-size:13px;
+  --dialog-label-size:12px;
+  --dialog-meta-size:11px;
+}
 .modal-layer {
   @apply fixed inset-0 z-50 flex;
 }
@@ -161,6 +173,9 @@ button:focus-visible {
 }
 .modal-shell--center {
   @apply max-h-full w-full max-w-110;
+}
+.modal-shell--wide {
+  max-width:600px;
 }
 .modal-layer--expanded {
   padding: 16px;
@@ -177,35 +192,47 @@ button:focus-visible {
   @apply absolute inset-y-1 right-1 w-full max-w-[calc(100%-var(--spacing)*2)] lg:w-150;
 }
 .modal-master-header {
-  @apply flex min-h-10 shrink-0 items-center gap-2.5 border-b-(length:--border-width-ui) border-border pb-1 pl-3;
+  @apply flex min-h-14 shrink-0 items-center gap-2.5 border-b-(length:--border-width-ui) border-border pt-1 pr-1 pb-2 pl-3;
 }
 .modal-header-copy {
   @apply flex min-w-0 flex-1 flex-col gap-1.5;
 }
 .modal-header-title {
-  @apply m-0 font-semibold text-sm leading-5.25 text-fg;
-}
-.modal-shell--side .modal-master-header {
-  @apply py-3;
+  @apply m-0 font-semibold text-fg;
+  font-size:var(--dialog-title-size);
+  line-height:26px;
 }
 .modal-shell--side .modal-header-title {
-  @apply text-xl leading-7.5;
+  font-size:var(--dialog-title-size);
+  line-height:26px;
 }
 .modal-master-body {
   container-type: inline-size;
   @apply flex min-h-0 min-w-0 flex-col gap-1 overflow-y-auto px-3 pt-3;
+  font-size:var(--dialog-body-size);
+  line-height:20px;
 }
 .modal-shell--side .modal-master-body {
   @apply flex-1 gap-5 pb-3;
 }
 .modal-description {
-  @apply m-0 font-sans text-sm font-normal leading-5.25 text-fg-subtle;
+  @apply m-0 font-sans font-normal text-fg-muted;
+  font-size:var(--dialog-label-size);
+  line-height:19px;
 }
+.modal-section { display:grid; gap:12px; min-width:0; }
+.modal-section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.modal-section-title { margin:0; color:var(--color-fg); font-size:var(--dialog-section-size); font-weight:600; line-height:22px; }
+.modal-field { display:grid; gap:8px; min-width:0; }
+.modal-field-label { font-size:var(--dialog-label-size); font-weight:600; line-height:18px; }
+.modal-meta { color:var(--color-fg-muted); font-size:var(--dialog-meta-size); font-weight:400; line-height:16px; }
+.modal-shell .ds-button,.modal-shell .control,.modal-shell .select-menu__option { font-size:var(--dialog-body-size); line-height:20px; }
+.modal-shell .control { margin-top:0; }
 .modal-master-footer {
   @apply shrink-0 px-3 py-3;
 }
 .drawer-close {
-  @apply flex size-9 shrink-0 items-center justify-center rounded-lg border-0 bg-transparent text-fg-subtle cursor-pointer;
+  @apply flex size-11 shrink-0 items-center justify-center rounded-lg border-0 bg-transparent text-fg-subtle cursor-pointer;
 }
 .drawer-close:hover {
   @apply bg-slate-100 text-fg;

@@ -9,13 +9,13 @@ import { MagnifyingGlass } from "@phosphor-icons/react/dist/csr/MagnifyingGlass"
 import { ArrowSquareOut } from "@phosphor-icons/react/dist/csr/ArrowSquareOut"
 import { Command } from "@phosphor-icons/react/dist/csr/Command"
 import { Compass } from "@phosphor-icons/react/dist/csr/Compass"
-import { Info } from "@phosphor-icons/react/dist/csr/Info"
+import { DotsThree } from "@phosphor-icons/react/dist/csr/DotsThree"
 import { FolderSimple } from "@phosphor-icons/react/dist/csr/FolderSimple"
 import { SpinnerGap } from "@phosphor-icons/react/dist/csr/SpinnerGap"
 import { WarningCircle } from "@phosphor-icons/react/dist/csr/WarningCircle"
 import { X } from "@phosphor-icons/react/dist/csr/X"
 import type { Scenario } from "../shared/types"
-import { Button, ContextPanel, Heading, Input, Tooltip } from "./ui"
+import { Button, ContextPanel, Heading, Input, RadioGroup, RadioOption, Tooltip } from "./ui"
 import {
   cancelCapture,
   cancelCrawl,
@@ -32,6 +32,9 @@ import ScreenFrame from "./ScreenFrame"
 import FolderNavigator from "./FolderNavigator"
 import ScreenPicker from "./ScreenPicker"
 import ScreenLightbox from "./ScreenLightbox"
+import FigmaExport from "./FigmaExport"
+import FigmaConnection from "./FigmaConnection"
+import ScreenSelect from "./ScreenSelect"
 import useArrowKeys from "./useArrowKeys"
 import IssuesPanel, { type Issue } from "./IssuesPanel"
 import { usePreviewIssues } from "./previewIssues"
@@ -108,6 +111,16 @@ function JobStatus({ state }: { state: ExplorerState }) {
 
 type Origin = "manual" | "crawled" | "both"
 
+function CatalogTotals({ label, screens, sections, connections }: { label: string; screens: number; sections: number; connections: number }) {
+  return (
+    <div className="design-workbench-metrics design-origin-metrics" role="group" aria-label={`${label} catalog totals`}>
+      <div><strong>{screens}</strong><span>Screens</span></div>
+      <div><strong>{sections}</strong><span>Sections</span></div>
+      <div><strong>{connections}</strong><span>Connections</span></div>
+    </div>
+  )
+}
+
 function Loaded({ data }: { data: ExplorerState }) {
   // Hand-written and explored scenarios can both exist; show the curated set unless there is none.
   const hasManual = data.scenarios.some((s) => s.origin === "manual")
@@ -129,6 +142,21 @@ function Loaded({ data }: { data: ExplorerState }) {
   )
   const [query, setQuery] = useState(() => new URLSearchParams(location.search))
   const [search, setSearch] = useState("")
+  const [screenSelection, setScreenSelection] = useState<Set<string>>(() => {
+    const saved = readSession("figma-screen-selection")
+    return new Set(Array.isArray(saved) ? saved.filter((id): id is string => typeof id === "string") : [])
+  })
+  useEffect(() => { writeSession("figma-screen-selection", [...screenSelection]) }, [screenSelection])
+  const setScreenSelected = useCallback((id: string, checked: boolean) => {
+    setScreenSelection(previous => {
+      const next = new Set(previous)
+      if (checked) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  }, [])
+  // An explicit batch survives browsing filters; removed catalog entries are never exported.
+  const exportScreens = useMemo(() => data.scenarios.filter(s => screenSelection.has(s.id)), [data.scenarios, screenSelection])
   const [revision, setRevision] = useState(0)
   const [viewport, setViewport] = useState<ViewportPreset>(() => {
     const saved = readSession("preview-viewport")
@@ -197,7 +225,7 @@ function Loaded({ data }: { data: ExplorerState }) {
   const filtered = useMemo(
     () =>
       selectedScenarios.filter((s) =>
-        `${s.title} ${s.description ?? ""} ${s.group}`.toLowerCase().includes(search.toLowerCase()),
+        `${s.title} ${s.id} ${s.description ?? ""} ${s.group}`.toLowerCase().includes(search.toLowerCase()),
       ),
     [search, selectedScenarios],
   )
@@ -371,75 +399,75 @@ function Loaded({ data }: { data: ExplorerState }) {
   const workbench = (
     <main className="design-workbench">
       <header className="design-workbench-header">
-        <div className="flex items-center gap-3">
+        <div className="design-workbench-brand">
           <strong className="text-sm">UI Explorer</strong>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="design-workbench-header-actions">
           <JobStatus state={data} />
-          {data.mode !== "manual" && !exploring && (
-            <Tooltip label={nothingYet ? "Explore" : "Explore again"} side="bottom">
-              <Button variant="ghost" size="icon" aria-label="Explore this app" onClick={() => void startCrawl()}>
-                <ArrowsClockwise size={20} />
-              </Button>
-            </Tooltip>
-          )}
           <ContextPanel
             label="Workspace overview"
             open={infoOpen}
             onOpenChange={setInfoOpen}
             className="design-workbench-popover"
             trigger={
-              <Button variant="ghost" size="icon" aria-label="Workspace overview">
-                <Info size={20} />
+              <Button variant="outline" size="icon" aria-label="Workspace overview" title="Workspace options">
+                <DotsThree size={20} />
               </Button>
             }
           >
             <Heading level={2} className="text-base font-semibold">
               Workspace overview
             </Heading>
-            {hasManual && hasCrawled && (
-              <div className="design-origin" role="group" aria-label="Scenarios shown">
+            {hasManual && hasCrawled ? (
+              <div className="design-origin">
+                <p className="design-workspace-label" id="screen-sources-label">Screen sources</p>
+                <RadioGroup className="design-origin-options" aria-labelledby="screen-sources-label" value={origin} onValueChange={setChosenOrigin}>
                 {(
                   [
-                    ["manual", "Curated"],
-                    ["crawled", "Explored"],
-                    ["both", "Both"],
+                    ["manual", "Registered", "Screens and states defined in your project’s Explorer setup."],
+                    ["crawled", "Discovered", "States found automatically by exploring your app."],
+                    ["both", "All screens", "Registered and discovered screens together."],
                   ] as const
-                ).map(([value, label]) => (
-                  <Button
-                    key={value}
-                    variant={origin === value ? "secondary-2" : "ghost"}
-                    size="sm"
-                    aria-pressed={origin === value}
-                    onClick={() => setChosenOrigin(value)}
-                  >
-                    {label}
-                  </Button>
+                ).map(([value, label, description]) => (
+                  <div key={value} className="design-origin-card" data-selected={origin === value}>
+                    <RadioOption
+                      className="design-origin-option"
+                      value={value}
+                      aria-label={label}
+                      aria-describedby={`screen-source-${value}-description`}
+                    >
+                      <span><strong>{label}</strong><small id={`screen-source-${value}-description`}>{description}</small></span>
+                    </RadioOption>
+                    {origin === value && <CatalogTotals label={label} screens={scenarios.length} sections={groups} connections={connections.length} />}
+                  </div>
                 ))}
+                </RadioGroup>
+              </div>
+            ) : (
+              <div className="design-origin">
+                <p className="design-workspace-label">Screen source</p>
+                <div className="design-origin-options design-origin-single">
+                  <div className="design-origin-summary">
+                    <strong>{hasManual ? "Registered" : "Discovered"}</strong>
+                    <small>{hasManual ? "Screens and states registered in this project’s Explorer setup." : "States found automatically by exploring your app."}</small>
+                  </div>
+                  <CatalogTotals label={hasManual ? "Registered" : "Discovered"} screens={scenarios.length} sections={groups} connections={connections.length} />
+                </div>
               </div>
             )}
-            <div className="design-workbench-metrics mt-5">
-              <div>
-                <strong>{scenarios.length}</strong>
-                <span>Screens</span>
-              </div>
-              <div>
-                <strong>{groups}</strong>
-                <span>Sections</span>
-              </div>
-              <div>
-                <strong>{connections.length}</strong>
-                <span>Connections</span>
-              </div>
+            <div className="design-workspace-actions">
+              {data.mode !== "manual" && !isStatic && !exploring && (
+                <Button variant="outline" size="sm" aria-label="Explore this app" leftIcon={<ArrowsClockwise size={16} />} onClick={() => { setInfoOpen(false); void startCrawl() }}>
+                  {nothingYet ? "Discover screens" : "Discover more screens"}
+                </Button>
+              )}
+              <Button variant="outline" size="sm" leftIcon={<ArrowSquareOut size={16} />} onClick={returnToUI}>
+                Return to UI
+              </Button>
             </div>
-            <div className="mt-5 flex items-center gap-2 border-t border-border pt-4 text-xs text-fg-subtle">
-              <Command size={16} />
-              <span>Alt + Shift + E · Gallery</span>
-            </div>
+            {!isStatic && <FigmaConnection />}
+            <details className="design-workspace-shortcuts"><summary><Command size={16} />Keyboard shortcuts</summary><p>/ or Ctrl/⌘ K · Search</p><p>Alt + Shift + E · Gallery</p><p>Alt + Shift + V · Switch view</p><p>Alt + Shift + R · Refresh selection</p></details>
           </ContextPanel>
-          <Button variant="outline" size="sm" leftIcon={<ArrowSquareOut size={16} />} onClick={returnToUI}>
-            Return to UI
-          </Button>
         </div>
       </header>
       <div className="design-workbench-layout">
@@ -481,7 +509,7 @@ function Loaded({ data }: { data: ExplorerState }) {
               <Input
                 aria-label="Search screen states"
                 ref={searchRef}
-                placeholder="Search  (press /)"
+                placeholder="Search screens"
                 value={search}
                 onKeyDown={(event) => {
                   if (event.key === "Escape") {
@@ -492,11 +520,12 @@ function Loaded({ data }: { data: ExplorerState }) {
                 }}
                 onChange={(event) => setSearch(event.target.value)}
               />
+              <kbd className="design-search-shortcut" aria-hidden="true">/</kbd>
             </div>
           </div>
           {filtered.length > 0 && (
             <div className="design-workbench-sectionline">
-              <span>{filtered.length}</span>
+              <span>{filtered.length} shown</span>
               {issues.length > 0 && (
                 <Button
                   variant="link-danger"
@@ -511,6 +540,16 @@ function Loaded({ data }: { data: ExplorerState }) {
                   {stale} stale
                 </Button>
               )}
+              <Button className="ml-auto" variant="ghost-slim" onClick={() => setScreenSelection(previous => new Set([...previous, ...filtered.map(s => s.id)]))}>
+                Select visible
+              </Button>
+            </div>
+          )}
+          {exportScreens.length > 0 && (
+            <div className="design-screen-selection-bar" role="region" aria-label="Screen selection">
+              <span role="status">{exportScreens.length} selected</span>
+              <FigmaExport scenarios={exportScreens} reviewSelection />
+              <Button variant="ghost-slim" onClick={() => setScreenSelection(new Set())}>Clear selection</Button>
             </div>
           )}
           {nothingYet && !exploring ? (
@@ -557,12 +596,12 @@ function Loaded({ data }: { data: ExplorerState }) {
                 </p>
               }
             >
-              <FlowCanvas scenarios={filtered} connections={connections} onOpen={setExpandedId} />
+              <FlowCanvas scenarios={filtered} connections={connections} onOpen={setExpandedId} selectedIds={screenSelection} onSelect={setScreenSelected} />
             </Suspense>
           ) : (
             <section className="design-screen-grid" aria-label="Screen gallery">
               {filtered.map((s: Scenario) => (
-                <article key={s.id} className="design-screen-card">
+                <article key={s.id} className="design-screen-card" data-selected={screenSelection.has(s.id)}>
                   <div className="design-screen-card__preview">
                     <ScreenFrame scenario={s} compact />
                     {/* Text-free overlay: the thumbnail's status text stays outside the button's name. */}
@@ -573,9 +612,12 @@ function Loaded({ data }: { data: ExplorerState }) {
                     />
                   </div>
                   <div className="design-screen-card__body">
-                    <Button className="design-screen-card__title" onClick={() => setExpandedId(s.id)}>
-                      {s.title}
-                    </Button>
+                    <div className="design-screen-card__heading">
+                      <Button className="design-screen-card__title" title={s.title} onClick={() => setExpandedId(s.id)}>
+                        {s.title}
+                      </Button>
+                      <ScreenSelect title={s.title} checked={screenSelection.has(s.id)} onChange={checked => setScreenSelected(s.id, checked)} />
+                    </div>
                     <div className="design-screen-card__meta">
                       <span className="design-screen-card__path" title={scenarioSource(s)}>
                         {folderCrumb(scenarioSource(s))}

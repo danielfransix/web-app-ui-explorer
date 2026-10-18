@@ -3,11 +3,20 @@ import type { IncomingMessage, ServerResponse } from "node:http"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import type { Scenario, ScenariosFile, Transition } from "../../shared/types"
+import { buildPlan } from "../../shared/plan"
 import { capture, readManifest } from "../capture"
 import { crawl } from "../crawl"
+import { captureDesigns } from "../design-capture"
 import type { UiExplorerOptions } from "../options"
 import { affectsPreviews, computeRevision } from "../revision"
 import { guessSources, listSources } from "../sources"
+import { startBridge } from "../bridge"
+import { selectionSchema } from "../local-import"
+
+// Named breakpoints the manual Copy control and the Figma export plan agree on - matches the client's
+// own viewport presets (src/client/viewports.ts). A width outside this map falls back to its raw pixel
+// value as the variant label, handled by buildPlan itself.
+const BREAKPOINT_LABELS: Record<number, string> = { 1440: "Desktop", 768: "Tablet", 390: "Mobile" }
 
 // The explorer itself, with no knowledge of any bundler. It is a Node request handler plus a few hooks, so
 // the same code runs behind the standalone `serve` proxy and inside the Vite plugin. A host only has to
@@ -94,6 +103,14 @@ export function createExplorer(init: ExplorerInit) {
   const mode = options.mode ?? "merge"
   const sourceDirs = options.sources ?? ["src"]
   const outDir = path.join(root, options.dir ?? ".ui-explorer")
+  let bridge: ReturnType<typeof startBridge> | undefined
+  let disposed = false
+  let closing: Promise<void> | undefined
+  const localBridge = (baseUrl: string) => {
+    if (disposed) throw new Error("UI Explorer is closing. Reopen it to prepare an import.")
+    // Start on first use, on a free loopback port, with the same capture settings as this Explorer.
+    return bridge ??= startBridge({ root, baseUrl, port: 0, route, startPath: options.startPath, storageState: options.storageState, allowWrites: options.allowWrites }).catch(error => { bridge = undefined; throw error })
+  }
 
   let revisionCache: string | undefined
   let sourcesCache: string[] | undefined
@@ -159,6 +176,7 @@ export function createExplorer(init: ExplorerInit) {
       startPath: options.startPath ?? generated?.startPath ?? "/",
       route,
       mode,
+      capabilities: { figmaImports: 1 },
       revision: revision(),
       generatedAt: generated?.generatedAt,
       scenarios: visible(),
@@ -339,6 +357,52 @@ export function createExplorer(init: ExplorerInit) {
         const found = scenarios().find((scenario) => scenario.id === id)
         return found ? json(res, found) : json(res, { error: "Unknown scenario" }, 404)
       }
+      if (rest === "/api/figma/connection") {
+        res.setHeader("Cache-Control", "no-store")
+        if (req.method !== "POST") { res.setHeader("Allow", "POST"); return json(res, { error: "Use POST to open a Figma connection" }, 405) }
+        const instance = await localBridge(`http://${req.headers.host ?? "localhost"}`)
+        return json(res, { connectionUrl: instance.url + "/#" + instance.token })
+      }
+      if (rest === "/api/figma/imports" && req.method === "POST") {
+        try {
+          const selection = selectionSchema.parse(await readBody(req))
+          // Resolve only the submitted IDs against this Explorer's visible catalog. No plugin browsing.
+          const selected = visible()
+          const instance = await localBridge(`http://${req.headers.host ?? "localhost"}`)
+          return json(res, instance.prepareImport(selection, selected, project), 201)
+        } catch (error) { return json(res, { error: error instanceof Error ? error.message : String(error) }, 400) }
+      }
+      if (rest === "/api/design" && req.method === "POST") {
+        const body = await readBody(req)
+        if (body.createComponents !== undefined && typeof body.createComponents !== "boolean") return json(res, { error: "Create components must be a boolean" }, 400)
+        const found = scenarios().find((scenario) => scenario.id === body.id)
+        if (!found) return json(res, { error: "Unknown scenario" }, 404)
+        const widths = Array.isArray(body.widths) ? body.widths : []
+        if (!widths.length || widths.some((width: unknown) => !Number.isInteger(width) || (width as number) < 1 || (width as number) > 7680))
+          return json(res, { error: "Choose widths from 1 to 7680 pixels" }, 400)
+        // A saved custom width's own label (e.g. "Laptop (1366px)") takes over from the generic
+        // "Breakpoint=1366" fallback - the client knows the name it saved, the server doesn't.
+        const labels = { ...BREAKPOINT_LABELS } as Record<number, string>
+        if (body.labels && typeof body.labels === "object") {
+          for (const [width, label] of Object.entries(body.labels as Record<string, unknown>)) {
+            if (Number.isInteger(Number(width)) && typeof label === "string" && label) labels[Number(width)] = label
+          }
+        }
+        try {
+          const captures = await captureDesigns({
+            baseUrl: `http://${req.headers.host ?? "localhost"}`,
+            startPath: options.startPath ?? "/",
+            scenario: found,
+            projectRoot: root,
+            widths,
+            storageState: options.storageState,
+            blockWrites: !options.allowWrites,
+          })
+          return json(res, { version: 1, plan: buildPlan(captures, labels, { createComponents: body.createComponents }) })
+        } catch (error) {
+          return json(res, { error: error instanceof Error ? error.message : String(error) }, 500)
+        }
+      }
       if (rest === "/api/events") {
         res.writeHead(200, {
           "Content-Type": "text/event-stream",
@@ -430,6 +494,7 @@ export function createExplorer(init: ExplorerInit) {
       `${dir}/api/state.json`,
       JSON.stringify({
         ...snapshot,
+        capabilities: { figmaImports: 0 },
         mode: "manual",
         route: `${prefix}${route}`,
         startPath: prefixed(snapshot.startPath),
@@ -453,11 +518,13 @@ export function createExplorer(init: ExplorerInit) {
 
   /** Stops running jobs and closes event streams. */
   function dispose() {
+    disposed = true
     controllers.crawl?.abort()
     controllers.capture?.abort()
     clearTimeout(pingTimer)
     for (const client of clients) client.end()
     clients.clear()
+    return closing ??= bridge?.then(instance => instance.close()) ?? Promise.resolve()
   }
 
   return {

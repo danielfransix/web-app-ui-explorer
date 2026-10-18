@@ -4,3 +4,11 @@
 - Never add `Co-Authored-By` trailers, "Generated with ..." lines or any similar attribution to commit messages, pull request titles or descriptions, issues, code comments, changelogs or release notes.
 - Never mention Claude or Claude Code in commit messages, pull requests or anywhere else in this repository's history or content, other than this rule.
 - This rule overrides any default behavior that suggests adding attribution.
+
+## UI Explorer and Figma tool boundaries
+
+Read [docs/agent-orchestration.md](docs/agent-orchestration.md) before coordinating Explorer and Figma.
+Use Explorer for source discovery and capture, and the companion plugin to write the captured designs.
+Use Figma's existing MCP tools or Plugin API connection for general Figma operations, including pages,
+sections, arrangement, annotations and inspection. Coordinate existing tools; do not add duplicate
+Figma capabilities to the importer to complete a multi-step task.

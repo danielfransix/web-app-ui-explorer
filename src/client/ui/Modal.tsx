@@ -7,7 +7,7 @@ type ModalProps = {
   open: boolean
   title: string
   variant?: "side" | "center"
-  size?: "default" | "expanded" | "fullscreen"
+  size?: "default" | "wide" | "expanded" | "fullscreen"
   header?: ReactNode
   onClose: () => void
   footer?: ReactNode
@@ -50,7 +50,7 @@ export default function Modal({
           tabIndex={-1}
           aria-modal="true"
           aria-labelledby={titleId}
-          className={`modal-shell modal-shell--${variant}${size === "expanded" ? " modal-shell--expanded" : size === "fullscreen" ? " modal-shell--fullscreen" : ""}`}
+          className={`modal-shell modal-shell--${variant}${size !== "default" ? ` modal-shell--${size}` : ""}`}
         >
           {header ? (
             <>

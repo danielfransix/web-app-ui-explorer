@@ -4,3 +4,6 @@ dist/
 *.log
 *.tgz
 .env*
+figma-plugin/code.js
+figma-plugin/ui.js
+figma-plugin/ui.html
