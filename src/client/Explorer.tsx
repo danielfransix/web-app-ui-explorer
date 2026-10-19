@@ -399,9 +399,7 @@ function Loaded({ data }: { data: ExplorerState }) {
   const workbench = (
     <main className="design-workbench">
       <header className="design-workbench-header">
-        <div className="design-workbench-brand">
-          <strong className="text-sm">UI Explorer</strong>
-        </div>
+        <Heading className="design-workbench-brand text-sm font-semibold">UI Explorer</Heading>
         <div className="design-workbench-header-actions">
           <JobStatus state={data} />
           <ContextPanel
@@ -484,10 +482,11 @@ function Loaded({ data }: { data: ExplorerState }) {
         />
         <div className="design-workbench-content">
           <div className="design-workbench-toolbar">
-            <div className="design-workbench-views">
+            <div className="design-workbench-views" role="group" aria-label="Explorer view">
               <Button
                 className="design-view-tab"
                 data-active={mode === "gallery"}
+                aria-pressed={mode === "gallery"}
                 variant="unstyled"
                 onClick={() => navigate("gallery")}
               >
@@ -497,6 +496,7 @@ function Loaded({ data }: { data: ExplorerState }) {
               <Button
                 className="design-view-tab"
                 data-active={mode === "canvas"}
+                aria-pressed={mode === "canvas"}
                 variant="unstyled"
                 onClick={() => navigate("canvas")}
               >
@@ -613,10 +613,10 @@ function Loaded({ data }: { data: ExplorerState }) {
                   </div>
                   <div className="design-screen-card__body">
                     <div className="design-screen-card__heading">
+                      <ScreenSelect title={s.title} checked={screenSelection.has(s.id)} onChange={checked => setScreenSelected(s.id, checked)} />
                       <Button className="design-screen-card__title" title={s.title} onClick={() => setExpandedId(s.id)}>
                         {s.title}
                       </Button>
-                      <ScreenSelect title={s.title} checked={screenSelection.has(s.id)} onChange={checked => setScreenSelected(s.id, checked)} />
                     </div>
                     <div className="design-screen-card__meta">
                       <span className="design-screen-card__path" title={scenarioSource(s)}>

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { Combobox } from "@base-ui/react/combobox"
-import { CaretDown } from "@phosphor-icons/react/dist/csr/CaretDown"
+import { MagnifyingGlass } from "@phosphor-icons/react/dist/csr/MagnifyingGlass"
 import { Check } from "@phosphor-icons/react/dist/csr/Check"
 import usePopupContainer from "./ui/usePopupContainer"
 import type { Scenario } from "../shared/types"
@@ -59,7 +59,7 @@ export default function ScreenPicker({
           className="control control--select screen-picker__input"
           onFocus={(event) => event.currentTarget.select()}
         />
-        <CaretDown size={16} aria-hidden="true" />
+        <MagnifyingGlass size={16} aria-hidden="true" />
         <Combobox.Portal container={container}>
           <Combobox.Positioner side="bottom" align="start" sideOffset={8} collisionPadding={8} className="uix-select-positioner">
             <Combobox.Popup className="select-menu uix-popup">

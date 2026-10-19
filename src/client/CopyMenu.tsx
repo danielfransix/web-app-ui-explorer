@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState, type FormEvent } from "react"
+import { useState, type FormEvent } from "react"
+import { CaretDown } from "@phosphor-icons/react/dist/csr/CaretDown"
+import { Plus } from "@phosphor-icons/react/dist/csr/Plus"
+import { TrashSimple } from "@phosphor-icons/react/dist/csr/TrashSimple"
 import { addCustomWidth, removeCustomWidth, useCustomWidths } from "./customWidths"
-import { Button, Input } from "./ui"
+import { Button, Checkbox, ContextPanel, Disclosure, DisclosurePanel, DisclosureTrigger, Input, Tooltip } from "./ui"
 import ComponentCreationSetting from "./ComponentCreationSetting"
 import { isCustomWidth, VIEWPORTS } from "./viewports"
 import { readApiJson } from "./apiResponse"
@@ -38,17 +41,7 @@ export default function CopyMenu({ scenarioId, currentWidth }: Props) {
   const [newLabel, setNewLabel] = useState("")
   const [newWidth, setNewWidth] = useState("")
   const [createComponents, setCreateComponents] = useState(true)
-  const root = useRef<HTMLDivElement>(null)
   const customWidths = useCustomWidths()
-
-  useEffect(() => {
-    if (!open) return
-    const onOutside = (event: MouseEvent) => {
-      if (root.current && !root.current.contains(event.target as Node)) setOpen(false)
-    }
-    document.addEventListener("mousedown", onOutside)
-    return () => document.removeEventListener("mousedown", onOutside)
-  }, [open])
 
   function toggle(id: string) {
     setChecked((prev) => {
@@ -112,29 +105,24 @@ export default function CopyMenu({ scenarioId, currentWidth }: Props) {
   }
 
   const label =
-    status === "busy" ? "Copying…" : status === "done" ? "Copied" : status === "error" ? "Copy failed" : "Copy ▾"
+    status === "busy" ? "Copying…" : status === "done" ? "Copied" : status === "error" ? "Copy failed" : "Copy"
 
   return (
-    <div className="design-copy-menu" ref={root}>
-      <Button variant="outline" size="sm" disabled={status === "busy"} aria-haspopup="true" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-        {label}
-      </Button>
-      {open && (
-        <div className="design-copy-menu__panel" onKeyDown={(event) => {
-          if (event.key === "Escape") { event.stopPropagation(); setOpen(false); root.current?.querySelector("button")?.focus() }
-        }}>
+    <div className="design-copy-menu">
+      <ContextPanel label="Copy settings" open={open} onOpenChange={setOpen} className="design-copy-menu__panel"
+        trigger={<Button variant="outline" size="sm" disabled={status === "busy"} rightIcon={<CaretDown size={14} aria-hidden="true" />}>{label}</Button>}>
           <h3 className="modal-section-title">Copy settings</h3>
           <div className="design-copy-menu__list" role="group" aria-label="Widths to copy">
             {!!currentWidth && (
               <label className="design-copy-menu__row">
-                <input type="checkbox" checked={checked.has("current")} onChange={() => toggle("current")} />
+                <Checkbox checked={checked.has("current")} onChange={() => toggle("current")} />
                 Current view ({currentWidth}px)
               </label>
             )}
             <div className="design-copy-menu__divider">Defaults</div>
             {DEFAULTS.map((preset) => (
               <label key={preset.id} className="design-copy-menu__row">
-                <input type="checkbox" checked={checked.has(preset.id)} onChange={() => toggle(preset.id)} />
+                <Checkbox checked={checked.has(preset.id)} onChange={() => toggle(preset.id)} />
                 {preset.label} ({preset.width}px)
               </label>
             ))}
@@ -144,36 +132,41 @@ export default function CopyMenu({ scenarioId, currentWidth }: Props) {
                 {customWidths.map((custom) => (
                   <div key={custom.id} className="design-copy-menu__row design-copy-menu__row--custom">
                     <label>
-                      <input type="checkbox" checked={checked.has(custom.id)} onChange={() => toggle(custom.id)} />
+                      <Checkbox checked={checked.has(custom.id)} onChange={() => toggle(custom.id)} />
                       {custom.label} ({custom.width}px)
                     </label>
-                    <button
-                      type="button"
+                    <Tooltip label={`Remove ${custom.label} (${custom.width}px)`}>
+                    <Button
+                      variant="ghost" size="icon"
                       className="design-copy-menu__remove"
                       aria-label={`Remove ${custom.label} (${custom.width}px)`}
                       onClick={() => { removeCustomWidth(custom.id); setChecked((prev) => { const next = new Set(prev); next.delete(custom.id); return next }) }}
                     >
-                      ×
-                    </button>
+                      <TrashSimple size={16} aria-hidden="true" />
+                    </Button>
+                    </Tooltip>
                   </div>
                 ))}
               </>
             )}
-            <form className="design-copy-menu__add" onSubmit={addCustom}>
-              <Input aria-label="Custom size name" placeholder="Name (e.g. Laptop)" value={newLabel} onChange={(event) => setNewLabel(event.target.value)} />
-              <Input aria-label="Custom size width in pixels" placeholder="Width" inputMode="numeric" value={newWidth} onChange={(event) => setNewWidth(event.target.value)} />
-              <Button type="submit" variant="outline" size="sm">
-                Add
-              </Button>
-            </form>
           </div>
+          <Disclosure className="design-copy-menu__custom">
+            <DisclosureTrigger variant="ghost" size="sm" rightIcon={<CaretDown size={14} aria-hidden="true" />}>Add custom size</DisclosureTrigger>
+            <DisclosurePanel>
+              <form className="design-copy-menu__add" onSubmit={addCustom}>
+                <label className="modal-field">Name<Input aria-label="Custom size name" placeholder="e.g. Laptop" value={newLabel} onChange={(event) => { setNewLabel(event.target.value); setError(undefined) }} /></label>
+                <label className="modal-field">Width<Input aria-label="Custom size width in pixels" placeholder="e.g. 1366" inputMode="numeric" value={newWidth} onChange={(event) => { setNewWidth(event.target.value); setError(undefined) }} /></label>
+                <Tooltip label="Add custom size"><Button type="submit" variant="outline" size="icon" aria-label="Add"><Plus size={16} aria-hidden="true" /></Button></Tooltip>
+              </form>
+            </DisclosurePanel>
+          </Disclosure>
+          {error && <p role="alert">{error}</p>}
           <ComponentCreationSetting value={createComponents} onChange={setCreateComponents} />
           <Button variant="default" size="sm" className="design-copy-menu__action" disabled={selectionCount === 0 || status === "busy"} onClick={run}>
             {status === "busy" ? "Copying…" : `Copy selected (${selectionCount})`}
           </Button>
-        </div>
-      )}
-      {error && <p role="alert">{error}</p>}
+      </ContextPanel>
+      {!open && error && <p role="alert">{error}</p>}
     </div>
   )
 }

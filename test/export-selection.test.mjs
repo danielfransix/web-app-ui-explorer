@@ -34,6 +34,10 @@ test('100 selected screens stay compact; paginated review and width chips preser
   }
   await review.click()
   const search=dialog.getByRole('textbox',{name:'Search screens to export',exact:true})
+  assert.ok(await search.evaluate(field=>{
+   const panel=field.parentElement
+   return panel.classList.contains('figma-export__review-panel')&&panel.querySelector('.figma-export__screens').parentElement===panel&&panel.querySelector('.figma-export__pagination').parentElement===panel
+  }),'search, list and pagination belong directly to one disclosure panel')
   assert.equal(await dialog.locator('.figma-export__screen').count(),8)
   await dialog.getByRole('button',{name:'Next screen page',exact:true}).click()
   await dialog.getByText('9–16 of 100 screens',{exact:true}).waitFor()
@@ -49,14 +53,14 @@ test('100 selected screens stay compact; paginated review and width chips preser
    await page.setViewportSize({width,height:900})
    const layout=await dialog.evaluate(node=>{
     const left=selector=>node.querySelector(selector).getBoundingClientRect().left
-    const field=node.querySelector('[aria-label="Search screens to export"]'),style=getComputedStyle(field)
+    const field=node.querySelector('[aria-label="Search screens to export"]')
     return {
-     row:left('.figma-export__screen strong'),count:left('.figma-export__pagination>span'),help:left('.figma-export__review-footer>p'),
-     search:field.getBoundingClientRect().left+parseFloat(style.borderLeftWidth)+parseFloat(style.paddingLeft),
+     row:left('.figma-export__screen strong'),count:left('.figma-export__pagination>span'),help:left('.figma-export__review-help'),
+     search:field.getBoundingClientRect().left,
      width:node.getBoundingClientRect().width,overflow:node.querySelector('.modal-master-body').scrollWidth>node.querySelector('.modal-master-body').clientWidth
     }
    })
-   assert.ok(Math.max(layout.row,layout.count,layout.help,layout.search)-Math.min(layout.row,layout.count,layout.help,layout.search)<1,'screen names, search text, count and help share a left edge: '+JSON.stringify(layout))
+   assert.ok(Math.max(layout.row,layout.count,layout.help,layout.search)-Math.min(layout.row,layout.count,layout.help,layout.search)<1,'screen names, search field, count and help share a left edge: '+JSON.stringify(layout))
    assert.equal(layout.overflow,false)
    assert.equal(layout.width,Math.min(600,width-40),'the wider dialog still fits narrow viewports')
    await dialog.locator('.modal-master-body').evaluate(node=>node.scrollTop=0)

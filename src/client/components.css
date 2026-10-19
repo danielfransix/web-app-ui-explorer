@@ -7,6 +7,8 @@ body {
 button {
   @apply font-sans;
 }
+:where(button, [role="button"], [role="tab"], [role="radio"], [role="checkbox"], [role="option"], [role="menuitem"], summary, a[href]) { cursor:pointer; }
+:where(button:disabled, [aria-disabled="true"], [data-disabled]) { cursor:not-allowed; }
 
 button:focus-visible {
   @apply outline-2 outline-offset-2 outline-focus;
@@ -34,14 +36,14 @@ button:focus-visible {
 .ds-button--variant-default {
   @apply bg-brand text-slate-50;
 }
-.ds-button--variant-default:hover {
-  @apply opacity-90;
+.ds-button--variant-default:hover:not(:disabled) {
+  @apply bg-brand-hover;
 }
 .ds-button--variant-outline {
-  @apply border-(length:--border-width-ui) border-slate-300 bg-canvas text-fg shadow-xs;
+  @apply border-(length:--border-width-ui) border-border bg-canvas text-fg;
 }
 .ds-button--variant-outline:hover:not(:disabled) {
-  @apply border-brand bg-canvas text-brand;
+  @apply bg-canvas-subtle text-brand;
 }
 .ds-button--variant-ghost {
   @apply bg-transparent text-fg;
@@ -69,7 +71,7 @@ button:focus-visible {
 
 /* Fields and dropdowns ----------------------------------------------------------------------------------- */
 .control {
-  @apply mt-1 h-12 w-full rounded-md border-(length:--border-width-ui) border-border bg-canvas px-4 font-sans text-sm font-normal leading-5.25 text-fg outline-none transition-colors;
+  @apply h-12 w-full rounded-md border-(length:--border-width-ui) border-border bg-canvas px-4 font-sans text-sm font-normal leading-5.25 text-fg outline-none transition-colors;
 }
 .control:focus {
   @apply border-brand;
@@ -96,8 +98,17 @@ button:focus-visible {
   @apply min-w-0 flex-1 truncate;
 }
 .control-select svg {
-  @apply pointer-events-none absolute right-4 top-1/2 mt-0.5 -translate-y-1/2 text-fg-muted;
+  @apply pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-fg-muted;
 }
+.copy-field { position:relative; min-width:0; }
+.copy-field .copy-field__input { padding-inline-end:56px; }
+.copy-field .copy-field__button { position:absolute; top:4px; inset-inline-end:4px; width:40px; height:40px; padding:0; }
+.copy-field__button:focus-visible { outline-offset:-2px; }
+.copy-field__error { margin:0; color:var(--color-danger); font-size:12px; line-height:18px; }
+.ds-checkbox { display:inline-grid; place-items:center; width:24px; height:28px; padding:0; flex-shrink:0; background:transparent; border:0; border-radius:4px; }
+.ds-checkbox__box { display:grid; place-items:center; width:16px; height:16px; border:1.4px solid var(--color-slate-350); border-radius:4px; background:var(--color-canvas); color:var(--color-white); }
+.ds-checkbox[data-checked] .ds-checkbox__box, .ds-checkbox[data-indeterminate] .ds-checkbox__box { border-color:var(--color-brand); background:var(--color-brand); }
+.ds-checkbox:hover .ds-checkbox__box { border-color:var(--color-brand); }
 .control-select:has(> .control:focus:not(:disabled)) > svg {
   @apply text-brand;
 }
@@ -106,6 +117,9 @@ button:focus-visible {
 }
 .select-menu__option {
   @apply flex cursor-pointer items-center justify-between gap-3 px-3 py-2.5 font-sans text-sm leading-5.25 text-fg;
+}
+.select-menu__group-label {
+  @apply px-3 pt-3 pb-1 font-sans text-xs font-semibold leading-4 text-fg-muted;
 }
 .select-menu__option-copy {
   @apply flex min-w-0 flex-1 flex-col;
@@ -194,11 +208,8 @@ button:focus-visible {
 .modal-master-header {
   @apply flex min-h-14 shrink-0 items-center gap-2.5 border-b-(length:--border-width-ui) border-border pt-1 pr-1 pb-2 pl-3;
 }
-.modal-header-copy {
-  @apply flex min-w-0 flex-1 flex-col gap-1.5;
-}
 .modal-header-title {
-  @apply m-0 font-semibold text-fg;
+  @apply m-0 min-w-0 flex-1 font-semibold text-fg;
   font-size:var(--dialog-title-size);
   line-height:26px;
 }

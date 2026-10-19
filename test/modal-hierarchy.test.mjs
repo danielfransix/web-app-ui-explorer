@@ -87,6 +87,7 @@ test('dialog titles, section headings, option labels and metadata retain distinc
   await preview.locator('.design-copy-menu > button').click()
   const copyTitle=await type(preview.getByRole('heading',{name:'Copy settings',level:3,exact:true}))
   const copyOption=await type(preview.locator('.design-copy-menu__row').first())
+  await preview.getByRole('button',{name:'Add custom size',exact:true}).click()
   await aligned(preview,['.design-copy-menu__panel>h3','.design-copy-menu__row','.design-copy-menu__divider','.design-copy-menu__add','.design-copy-menu__panel>.design-component-option','.design-copy-menu__action'])
   assert.ok(previewTitle.size>copyTitle.size&&copyTitle.size>copyOption.size)
   await page.screenshot({path:'.ui-explorer/modal-hierarchy-preview.png'})

@@ -96,6 +96,7 @@ const ScreenNode = memo(function ScreenNode({
         />
       </div>
       <div className="design-flow-node__caption">
+        <ScreenSelect title={s.title} checked={selection.ids.has(s.id)} onChange={checked => selection.select(s.id, checked)} />
         <Button
           className="design-flow-node__title nodrag"
           title={data.crumb}
@@ -103,7 +104,6 @@ const ScreenNode = memo(function ScreenNode({
         >
           {s.title}
         </Button>
-        <ScreenSelect title={s.title} checked={selection.ids.has(s.id)} onChange={checked => selection.select(s.id, checked)} />
       </div>
       <Handle type="source" position={Position.Right} id="out" />
     </article>
@@ -324,6 +324,7 @@ function Canvas(props: CanvasProps) {
           />
         </ReactFlow>
         <div className="design-flow-controls">
+          <Tooltip label="Zoom out">
           <Button
             variant="outline"
             size="icon"
@@ -332,7 +333,9 @@ function Canvas(props: CanvasProps) {
           >
             <Minus size={16} />
           </Button>
+          </Tooltip>
           <ZoomReadout />
+          <Tooltip label="Zoom in">
           <Button
             variant="outline"
             size="icon"
@@ -341,6 +344,7 @@ function Canvas(props: CanvasProps) {
           >
             <Plus size={16} />
           </Button>
+          </Tooltip>
           <span className="h-6 border-l border-border" />
           <Tooltip label="Fit all">
             <Button

@@ -1,7 +1,7 @@
 import { Check } from "@phosphor-icons/react/dist/csr/Check"
 import { Checkbox } from "./ui"
 
-/** Kept in the card caption so selecting never obscures or opens its thumbnail. */
+/** Reveal the square on hover or selection; retain the click target and keyboard focus outline. */
 export default function ScreenSelect({ title, checked, onChange }: {
   title: string
   checked: boolean

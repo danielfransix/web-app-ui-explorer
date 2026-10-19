@@ -215,6 +215,7 @@ export default function ScreenLightbox({
               aria-invalid={widthError}
               aria-describedby={widthError ? "preview-width-error" : undefined}
               className="control design-viewport-width"
+              placeholder="Width"
               type="number"
               min={MIN_CUSTOM_WIDTH}
               max={MAX_CUSTOM_WIDTH}

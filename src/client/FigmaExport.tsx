@@ -2,7 +2,7 @@ import { useRef, useState } from "react"
 import { X } from "@phosphor-icons/react/dist/csr/X"
 import type { Scenario } from "../shared/types"
 import type { ImportSummary } from "../shared/handoff"
-import { Button, Input, Modal, MultiSelect } from "./ui"
+import { Button, CopyField, Input, Modal, MultiSelect, Tooltip } from "./ui"
 import { addCustomWidth, useCustomWidths } from "./customWidths"
 import ExportScreenSelection from "./ExportScreenSelection"
 import ComponentCreationSetting from "./ComponentCreationSetting"
@@ -17,7 +17,6 @@ export default function FigmaExport({ scenarios, reviewSelection = false }: { sc
   const customInput = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false), [error, setError] = useState("")
   const [prepared, setPrepared] = useState<{ code: string; summary: ImportSummary }>()
-  const [copied, setCopied] = useState(false)
   const [createComponents, setCreateComponents] = useState(true)
   const savedWidths = useCustomWidths()
   const serverReady = useExplorerState()?.capabilities?.figmaImports === 1
@@ -25,7 +24,7 @@ export default function FigmaExport({ scenarios, reviewSelection = false }: { sc
   const sizes = [...widths]
   const valid = sizes.length > 0 && sizes.length <= 12 && !custom.trim()
   const presets = [...new Map([{ label: 'Desktop', width: 1440 }, { label: 'Tablet', width: 768 }, { label: 'Mobile', width: 390 }, ...savedWidths].map(p => [p.width, p])).values()]
-  const reset = () => { setPrepared(undefined); setError(""); setCopied(false) }
+  const reset = () => { setPrepared(undefined); setError("") }
   function changeWidths(next: number[]) { setWidths(new Set(next)); setCustomError("") }
   function addWidths() {
     const entries = custom.trim().split(/[\s,]+/).filter(Boolean)
@@ -65,11 +64,8 @@ export default function FigmaExport({ scenarios, reviewSelection = false }: { sc
           </section>
           <section className="modal-section">
             <p className="modal-description">Open UI Explorer design import in Figma and paste this code. Choose your canvas destination and arrangement there.</p>
-            <div className="modal-field">
-              <label className="modal-field-label" htmlFor="figma-import-code">Import code</label>
-              <Input id="figma-import-code" className="control figma-export__code" value={prepared.code} readOnly onFocus={event => event.target.select()} />
-            </div>
-            <Button variant="default" onClick={async () => { try { await navigator.clipboard.writeText(prepared.code); setCopied(true) } catch { setError('Select the code above and copy it with Ctrl+C (⌘C on Mac).') } }}>{copied ? 'Copied import code' : 'Copy import code'}</Button>
+            <CopyField id="figma-import-code" label="Import code" value={prepared.code} className="figma-export__code"
+              copyLabel="Copy import code" copiedLabel="Copied import code" fallback="Select the code above and copy it with Ctrl+C (⌘C on Mac)." />
             <p className="modal-meta">Keep UI Explorer running. This code expires in one hour and can be reused for re-imports during that time.</p>
           </section>
         </> : <>
@@ -86,7 +82,9 @@ export default function FigmaExport({ scenarios, reviewSelection = false }: { sc
               const label = presets.find(p => p.width === width)?.label
               return <li key={width} className="figma-export__chip">
                 <span>{label && label !== `${width}px` ? `${label} · ${width}px` : `${width}px`}</span>
-                <Button aria-label={`Remove ${width}px viewport width`} onClick={() => { changeWidths(sizes.filter(value => value !== width)); customInput.current?.focus() }}><X size={12} aria-hidden="true" /></Button>
+                <Tooltip label={`Remove ${width}px viewport width`}>
+                  <Button aria-label={`Remove ${width}px viewport width`} onClick={() => { changeWidths(sizes.filter(value => value !== width)); customInput.current?.focus() }}><X size={12} aria-hidden="true" /></Button>
+                </Tooltip>
               </li>
             })}</ul>}
             <div className="modal-field">

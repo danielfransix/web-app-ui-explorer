@@ -18,7 +18,7 @@ export type Issue = {
 const recipeFile = (scenario: Scenario) =>
   scenario.origin === "manual" ? "your scenarios (ui-explorer options)" : ".ui-explorer/scenarios.json"
 
-function CopyValue({ value, label }: { value: string; label: string }) {
+function CopyValue({ value, label, onError }: { value: string; label: string; onError: (message: string) => void }) {
   const [copied, setCopied] = useState(false)
   return (
     <Tooltip label={copied ? "Copied" : label} side="bottom">
@@ -26,11 +26,12 @@ function CopyValue({ value, label }: { value: string; label: string }) {
         variant="ghost"
         size="icon"
         aria-label={label}
-        onClick={() => {
-          void navigator.clipboard?.writeText(value).then(() => {
-            setCopied(true)
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(value)
+            setCopied(true); onError("")
             window.setTimeout(() => setCopied(false), 1200)
-          })
+          } catch { setCopied(false); onError("Could not copy. Select the value and copy it with Ctrl+C (⌘C on Mac).") }
         }}
       >
         {copied ? <Check size={16} /> : <Copy size={16} />}
@@ -40,12 +41,16 @@ function CopyValue({ value, label }: { value: string; label: string }) {
 }
 
 function Where({ term, value, copy }: { term: string; value: string; copy?: string }) {
+  const [copyError, setCopyError] = useState("")
   return (
     <div className="design-issue__where">
       <dt>{term}</dt>
       <dd>
-        <code>{value}</code>
-        <CopyValue value={copy ?? value} label={`Copy ${term.toLowerCase()}`} />
+        <div className="design-issue__value">
+          <code>{value}</code>
+          <CopyValue value={copy ?? value} label={`Copy ${term.toLowerCase()}`} onError={setCopyError} />
+        </div>
+        {copyError && <p className="copy-field__error" role="alert">{copyError}</p>}
       </dd>
     </div>
   )
@@ -98,9 +103,7 @@ export default function IssuesPanel({
       )}
       {stale > 0 && !isStatic && (
         <section className="design-issue" aria-label="Out of date captures">
-          <div className="design-issue__head">
-            <h3 className="modal-section-title">{stale} out of date</h3>
-          </div>
+          <h3 className="modal-section-title">{stale} out of date</h3>
           <Button variant="outline" size="sm" onClick={() => void startCapture()}>
             Capture again
           </Button>

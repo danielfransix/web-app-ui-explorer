@@ -1,7 +1,7 @@
 import { Select as BaseSelect } from "@base-ui/react/select"
 import { CaretDown } from "@phosphor-icons/react/dist/csr/CaretDown"
 import { Check } from "@phosphor-icons/react/dist/csr/Check"
-import { Children, isValidElement, useState, type ReactNode, type SelectHTMLAttributes } from "react"
+import { Children, Fragment, isValidElement, useState, type ReactNode, type SelectHTMLAttributes } from "react"
 import usePopupContainer from "./usePopupContainer"
 
 type SelectProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, "onChange"> & {
@@ -78,9 +78,9 @@ export default function Select({
             <BaseSelect.Popup className="select-menu uix-popup">
               <BaseSelect.List>
                 {items.map((option, index) => (
-                  <div key={option.value}>
+                  <Fragment key={option.value}>
                   {option.group && option.group !== items[index - 1]?.group && (
-                    <div className="design-copy-menu__divider">{option.group}</div>
+                    <div className="select-menu__group-label">{option.group}</div>
                   )}
                   <BaseSelect.Item
                     key={option.value}
@@ -95,7 +95,7 @@ export default function Select({
                       <Check size={16} aria-hidden="true" />
                     </BaseSelect.ItemIndicator>
                   </BaseSelect.Item>
-                  </div>
+                  </Fragment>
                 ))}
               </BaseSelect.List>
             </BaseSelect.Popup>

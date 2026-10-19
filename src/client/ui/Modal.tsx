@@ -2,6 +2,7 @@ import { Dialog } from "@base-ui/react/dialog"
 import { X } from "@phosphor-icons/react/dist/csr/X"
 import { useId, type ReactNode } from "react"
 import Button from "./Button"
+import Tooltip from "./Tooltip"
 
 type ModalProps = {
   open: boolean
@@ -59,11 +60,10 @@ export default function Modal({
             </>
           ) : (
             <header className="modal-master-header">
-              <div className="modal-header-copy">
-                <Dialog.Title id={titleId} className="modal-header-title">
-                  {title}
-                </Dialog.Title>
-              </div>
+              <Dialog.Title id={titleId} className="modal-header-title">
+                {title}
+              </Dialog.Title>
+              <Tooltip label="Close">
               <Dialog.Close
                 render={
                   <Button className="drawer-close" aria-label="Close">
@@ -71,6 +71,7 @@ export default function Modal({
                   </Button>
                 }
               />
+              </Tooltip>
             </header>
           )}
           <div className="modal-master-body">{children}</div>

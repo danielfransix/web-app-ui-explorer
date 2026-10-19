@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { CaretDown } from "@phosphor-icons/react/dist/csr/CaretDown"
 import type { Scenario } from "../shared/types"
-import { Button, Disclosure, DisclosurePanel, DisclosureTrigger, Input } from "./ui"
+import { Button, Checkbox, Disclosure, DisclosurePanel, DisclosureTrigger, Input } from "./ui"
 
 const PAGE_SIZE = 8
 
@@ -22,29 +22,23 @@ export default function ExportScreenSelection({ scenarios, selected, onChange, r
         <span><strong>{count} {count === 1 ? "screen" : "screens"} selected</strong><small>{open ? "Hide selection" : "Review selection"}</small></span>
       </DisclosureTrigger>
       <DisclosurePanel className="figma-export__review-panel">
-        <div className="figma-export__screen-review">
           <Input className="control" aria-label="Search screens to export" value={search} onChange={event => { setSearch(event.target.value); setPage(0) }} placeholder="Search title or screen ID" />
           {!readOnly && <div className="figma-export__actions">
             <Button variant="ghost" size="sm" onClick={() => onChange(new Set(scenarios.map(s => s.id)))}>Select all</Button>
             <Button variant="ghost" size="sm" onClick={() => onChange(new Set())}>Clear</Button>
           </div>}
-          <div className="figma-export__screen-results">
             <div ref={list} className="figma-export__screens" role="group" aria-label="Screens to export">
               {visible.map(s => readOnly
                 ? <div className="figma-export__screen" key={s.id}><span><strong>{s.title}</strong><small>{s.id}</small></span></div>
-                : <label className="figma-export__screen" key={s.id}><input type="checkbox" checked={selected.has(s.id)} onChange={event => { const next = new Set(selected); event.target.checked ? next.add(s.id) : next.delete(s.id); onChange(next) }} /><span><strong>{s.title}</strong><small>{s.id}</small></span></label>)}
+                : <label className="figma-export__screen" key={s.id}><Checkbox checked={selected.has(s.id)} onChange={checked => { const next = new Set(selected); checked ? next.add(s.id) : next.delete(s.id); onChange(next) }} /><span><strong>{s.title}</strong><small>{s.id}</small></span></label>)}
               {!matches.length && <p className="modal-meta figma-export__empty" role="status">No screens match your search.</p>}
             </div>
-            <div className="figma-export__review-footer">
               <nav className="figma-export__pagination" aria-label="Screen review pages">
                 <span className="modal-meta" role="status">{matches.length ? `${start + 1}${visible.length > 1 ? `–${start + visible.length}` : ""}` : "0"} of {matches.length} {matches.length === 1 ? "screen" : "screens"}</span>
                 <Button variant="outline" size="sm" aria-label="Previous screen page" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Previous</Button>
                 <Button variant="outline" size="sm" aria-label="Next screen page" disabled={currentPage + 1 >= pages} onClick={() => setPage(currentPage + 1)}>Next</Button>
               </nav>
-              {readOnly && <p className="modal-meta">Change this selection on your Explorer cards.</p>}
-            </div>
-          </div>
-        </div>
+              {readOnly && <p className="modal-meta figma-export__review-help">Change this selection on your Explorer cards.</p>}
       </DisclosurePanel>
     </Disclosure>
   </section>
