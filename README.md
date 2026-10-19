@@ -173,6 +173,12 @@ The plugin and `serve` share one core and take the same options.
 
 Every recipe starts from a clean page load, so a state can always be reproduced. While exploring and capturing, requests that change data (POST, PUT, PATCH, DELETE) are answered with an empty success and never reach your server.
 
+Recipes can cross ordinary page links, same-origin redirects and GET form submissions, then continue interacting with the destination. The crawler and browser previews share the same replay lifecycle, including thumbnails and editable captures. Full-page transitions require session storage for a short-lived, tab-local continuation; completed recipes clear it. Client-side routes and hash links continue within the current document. Navigations to another origin, downloads and new tabs are outside the crawl.
+
+Discovered recipes record their `replayViewport`. Previews and captures reach the state at that size, then resize to the requested viewport. A desktop navigation link hidden by mobile CSS therefore does not prevent a mobile preview. Registered recipes can set the same optional field; without it, they replay at the requested size as before. Custom preview URLs keep the host's own routing behavior.
+
+Source folders populate the file tree; they do not automatically register every route. Discovery follows reachable controls. Check the crawl's failed replay count and stopping reason when assessing coverage; pages that are unlinked or require unsupported interactions can be registered explicitly as scenarios.
+
 ## Options
 
 Options live in `ui-explorer.config.mjs` (or `.js`, `.json`, or `.ts` on Node 22.18+) at the project root, and are the same ones the Vite plugin takes. Command-line flags override the file.

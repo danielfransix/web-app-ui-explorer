@@ -1,5 +1,6 @@
 import { hashString } from "../shared/hash"
 import { PREVIEW_PARAM, STATUS_ATTRIBUTE, type PreviewMessage } from "../shared/preview"
+import { replayController, replayId, takeContinuation } from "./replay"
 import type {
   Action,
   AutofillResult,
@@ -166,7 +167,12 @@ function trackWork() {
 const previewId = new URLSearchParams(location.search).get(PREVIEW_PARAM)
 // A crawler may have installed the runtime already; the copy the app injects must not run a second time.
 const ALREADY = !!window.__uix
-const ACTIVE = !ALREADY && (previewId !== null || (window as unknown as { __UIX_FORCE?: boolean }).__UIX_FORCE === true)
+const continuation = ALREADY ? undefined : takeContinuation()
+if (continuation) {
+  window.__UIX_ROUTE = continuation.endpoint
+  window.__UIX_STATIC = continuation.static
+}
+const ACTIVE = !ALREADY && (continuation !== undefined || previewId !== null || (window as unknown as { __UIX_FORCE?: boolean }).__UIX_FORCE === true)
 if (ACTIVE) trackWork()
 // The injected runtime precedes the host's scripts. Track completed async scripts/styles so preview
 // readiness can wait for hydration without also waiting for unrelated images or embedded media.
@@ -232,37 +238,6 @@ async function waitFor(action: Action, timeoutMs: number): Promise<Element | nul
     if (performance.now() - start > timeoutMs) return null
     await frame()
   }
-}
-
-async function replay(
-  actions: Action[],
-  options: { timeoutMs?: number; settleMs?: number } = {},
-): Promise<ReplayResult> {
-  const timeout = options.timeoutMs ?? 8000
-  for (const [index, action] of actions.entries()) {
-    const element = await waitFor(action, timeout)
-    if (!element) {
-      const text = action.kind === "click" && action.text ? ` "${action.text}"` : ""
-      return {
-        ok: false,
-        step: index,
-        message: `Step ${index + 1} of ${actions.length}: could not find ${action.selector}${text}`,
-      }
-    }
-    try {
-      perform(action, element)
-    } catch (error) {
-      return {
-        ok: false,
-        step: index,
-        message: `Step ${index + 1} of ${actions.length}: ${
-          error instanceof Error ? error.message : "the step failed"
-        }`,
-      }
-    }
-    await settle(options.settleMs ?? 120)
-  }
-  return { ok: true }
 }
 
 // ---- Building recipe steps for elements -----------------------------------------------------------
@@ -911,7 +886,9 @@ function candidates(options: { deny?: string[] } = {}): Candidate[] {
     const key = JSON.stringify(action)
     if (seen.has(key)) continue
     seen.add(key)
-    found.push({ action, label, role: roleOf(element), primary: PRIMARY.test(label) })
+    const url = element instanceof HTMLAnchorElement ? new URL(element.href, location.href) : undefined
+    found.push({ action, label, role: roleOf(element), primary: PRIMARY.test(label),
+      ...(url ? { destination: `${url.pathname}${url.search}${url.hash}` } : {}) })
   }
   // Native dropdowns: one candidate per choice.
   for (const select of Array.from(document.querySelectorAll("select")).filter((element) =>
@@ -1164,19 +1141,24 @@ function loaded(timeoutMs: number): Promise<void> {
   })
 }
 
-/** Opened as `?__uix=<id>`: fetch the recipe, replay it, and say whether it worked. */
+const controller = replayController({
+  resolve: waitFor, perform, settle,
+  ready: async () => {
+    if (!(await waitForContent(20_000))) throw new Error("The page stayed empty")
+    await loaded(20_000)
+    await settle(150, 3000)
+  },
+  report, endpoint: route, isStatic: () => !!window.__UIX_STATIC,
+})
+const replay = controller.replay
+
+/** Opened as `?__uix=<id>`: fetch once; document continuations carry the remaining recipe. */
 async function runPreview(id: string) {
   try {
     const response = await fetch(`${route()}api/scenario/${encodeURIComponent(id)}${window.__UIX_STATIC ? ".json" : ""}`)
     if (!response.ok) throw new Error(`Unknown scenario "${id}"`)
     const scenario = (await response.json()) as { actions?: Action[] }
-    if (!(await waitForContent(20_000))) throw new Error("The page stayed empty")
-    // Server-rendered pages show text before their scripts have made the buttons work.
-    await loaded(20_000)
-    await settle(200, 3000)
-    const result = await replay(scenario.actions ?? [])
-    if (!result.ok) throw new Error(result.message)
-    report(id)
+    controller.start(replayId(), scenario.actions ?? [], {}, id)
   } catch (error) {
     report(id, error instanceof Error ? error.message : "The preview failed to start")
   }
@@ -1187,6 +1169,9 @@ async function runPreview(id: string) {
 const runtime: UixRuntime = {
   version: 1,
   replay,
+  startReplay: controller.start,
+  replayStatus: controller.status,
+  cancelReplay: controller.cancel,
   settle: (quietMs, maxMs) => settle(quietMs, maxMs),
   snapshot,
   candidates,
@@ -1286,7 +1271,9 @@ if (!ALREADY && !ACTIVE && window.parent === window && ![...new URLSearchParams(
 
 if (ACTIVE) {
   window.__uix = runtime
-  if (previewId) {
+  if (continuation) {
+    controller.resume(continuation)
+  } else if (previewId) {
     const start = () => void runPreview(previewId)
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, { once: true })
     else start()

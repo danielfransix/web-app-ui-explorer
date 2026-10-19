@@ -4,6 +4,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { chromium, type BrowserContext, type Page } from "playwright"
+import { replayPage } from "./replay"
 import type {
   Action,
   AutofillResult,
@@ -59,6 +60,7 @@ type Item = {
   via?: string
   /** Lower goes first. Moving the flow on finds new screens; everything else mostly finds variants. */
   priority: number
+  destination?: string
 }
 
 type State = {
@@ -145,6 +147,7 @@ export type CrawlResult = {
 }
 
 export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
+  options.signal?.throwIfAborted()
   const started = Date.now()
   const log = options.log ?? (() => {})
   const startPath = options.startPath ?? "/"
@@ -155,6 +158,7 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
   const concurrency = Math.max(1, options.concurrency ?? Math.max(2, Math.min(5, Math.floor(os.cpus().length / 2))))
   const budget = options.timeBudgetMs ?? 15 * 60_000
   const deny = options.deny
+  const viewport = options.viewport ?? { width: 1280, height: 900 }
   const runtime = runtimeSource()
   const startUrl = new URL(startPath, options.baseUrl).toString()
 
@@ -167,10 +171,14 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
   const byKey = new Map<string, State>()
   const byId = new Map<string, State>()
   const usedIds = new Set<string>()
+  const visitedUrls = new Set<string>()
   const queue: Item[] = [{ actions: [], label: "Start", priority: 0 }]
   const nextItem = () => {
     let best = -1
-    for (let i = 0; i < queue.length; i++) if (best < 0 || queue[i].priority < queue[best].priority) best = i
+    // A shared header/footer appears on every page. Replaying those links before deeper routes can
+    // exhaust the budget on duplicates. Defer visited destinations without dropping any interactions.
+    const priority = (item: Item) => item.destination ? visitedUrls.has(item.destination) ? 3 : -1 : item.priority
+    for (let i = 0; i < queue.length; i++) if (best < 0 || priority(queue[i]) < priority(queue[best])) best = i
     return best < 0 ? undefined : queue.splice(best, 1)[0]
   }
   // A control that keeps producing nothing new (a disabled-looking nav link, a decorative button) is not
@@ -205,26 +213,33 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
       stats.stoppedBy = reason
     }
   }
+  const abort = () => { stop("cancelled"); void browser.close().catch(() => {}) }
+  options.signal?.addEventListener("abort", abort, { once: true })
+  if (options.signal?.aborted) abort()
+  const deadline = setTimeout(() => { stop("time-budget"); void browser.close().catch(() => {}) }, budget)
 
   async function newContext(): Promise<BrowserContext> {
     const context = await browser.newContext({
-      viewport: options.viewport ?? { width: 1280, height: 900 },
+      viewport,
       storageState: options.storageState,
     })
     // __UIX_FORCE switches the runtime on in every page, not only in preview pages.
     await context.addInitScript({ content: `window.__UIX_FORCE = true;
 ${runtime}` })
-    if (options.blockWrites ?? true) {
-      await context.route("**/*", (route) => {
-        const method = route.request().method()
-        if (method === "GET" || method === "HEAD" || method === "OPTIONS") return route.continue()
-        return route.fulfill({ status: 200, contentType: "application/json", body: "{}" })
-      })
-    }
+    await context.route("**/*", (route) => {
+      const request = route.request()
+      if (request.isNavigationRequest() && request.frame().parentFrame() === null && new URL(request.url()).origin !== new URL(startUrl).origin)
+        return route.abort("blockedbyclient")
+      const method = request.method()
+      if (!(options.blockWrites ?? true) || method === "GET" || method === "HEAD" || method === "OPTIONS") return route.continue()
+      return route.fulfill({ status: 200, contentType: "application/json", body: "{}" })
+    })
     return context
   }
 
   async function load(page: Page) {
+    // A failed or interrupted attempt must not leave a continuation to run during the next reset.
+    await page.evaluate(() => (window as W).__uix?.cancelReplay()).catch(() => {})
     await page.goto(startUrl, { waitUntil: "domcontentloaded" })
     // A page rendered on the server shows its text at once, but its buttons do nothing until the scripts have run
     // and the framework has taken over. Waiting for the load event means every script the page asked for has run.
@@ -247,10 +262,7 @@ ${runtime}` })
     }
     if (!actions.length) return { ok: true }
     try {
-      return await page.evaluate(
-        (steps) => (window as W).__uix!.replay(steps, { settleMs: 90, timeoutMs: 15_000 }),
-        actions,
-      )
+      return await replayPage(page, actions, { settleMs: 90, timeoutMs: 15_000 })
     } catch (error) {
       return {
         ok: false,
@@ -270,6 +282,7 @@ ${runtime}` })
     kind: state.kind,
     actions: state.actions,
     fingerprint: state.key,
+    replayViewport: viewport,
   })
 
   const announce = (last?: string) =>
@@ -306,6 +319,7 @@ ${runtime}` })
       controls: new Set(),
     }
     states.push(state)
+    visitedUrls.add(snapshot.url)
     byKey.set(state.key, state)
     byId.set(state.id, state)
     stats.states = states.length
@@ -330,17 +344,18 @@ ${runtime}` })
   }
 
   async function process(page: Page, item: Item) {
-    if (pointless(item.via)) {
+    if (pointless(item.via) && (!item.destination || visitedUrls.has(item.destination))) {
       stats.skipped++
       return
     }
     let result = await replay(page, item.actions)
     // Slow loads and a dev server reloading under us are worth a few more tries before giving up.
-    for (let attempt = 0; attempt < 2 && !result.ok; attempt++) {
+    for (let attempt = 0; attempt < 2 && !result.ok && !stopped; attempt++) {
       await sleep(400 * (attempt + 1))
       result = await replay(page, item.actions)
     }
     if (!result.ok) {
+      if (stopped) return
       stats.failedReplays++
       log(`  ! could not replay "${item.label}": ${result.message}`)
       if (options.debug) log(`    ${JSON.stringify(item.actions)}`)
@@ -397,6 +412,7 @@ ${runtime}` })
         // Moving the flow on depends on the state it is pressed in, so it is never written off.
         via: candidate.primary ? undefined : JSON.stringify(candidate.action),
         priority: candidate.primary ? 0 : 1,
+        destination: candidate.destination,
       })
     }
 
@@ -431,10 +447,12 @@ ${runtime}` })
   }
 
   async function worker() {
-    const context = await newContext()
-    const page = await context.newPage()
-    page.on("dialog", (dialog) => void dialog.dismiss().catch(() => {}))
+    let context: BrowserContext | undefined
     try {
+      if (stopped) return
+      context = await newContext()
+      const page = await context.newPage()
+      page.on("dialog", (dialog) => void dialog.dismiss().catch(() => {}))
       for (;;) {
         if (stopped) break
         if (options.signal?.aborted) {
@@ -455,14 +473,17 @@ ${runtime}` })
         try {
           await process(page, item)
         } catch (error) {
+          if (stopped) break
           stats.failedReplays++
           log(`  ! ${item.label}: ${error instanceof Error ? error.message.split("\n")[0] : error}`)
         } finally {
           inFlight--
         }
       }
+    } catch (error) {
+      if (!stopped) throw error
     } finally {
-      await context.close().catch(() => {})
+      await context?.close().catch(() => {})
     }
   }
 
@@ -470,6 +491,8 @@ ${runtime}` })
   try {
     await Promise.all(Array.from({ length: concurrency }, worker))
   } finally {
+    options.signal?.removeEventListener("abort", abort)
+    clearTimeout(deadline)
     await browser.close().catch(() => {})
   }
   stats.seconds = Math.round((Date.now() - started) / 100) / 10

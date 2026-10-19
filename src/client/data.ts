@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react"
-import type { Scenario, Transition } from "../shared/types"
+import type { CrawlStats, Scenario, Transition } from "../shared/types"
 
 // The explorer's data comes from the Vite plugin's API and stays current through server-sent events:
 // scenarios, thumbnails and running jobs all change while the page is open.
@@ -20,6 +20,7 @@ export type ExplorerState = {
   capabilities?: { figmaImports?: number }
   revision: string
   generatedAt?: string
+  crawlStats?: CrawlStats
   scenarios: Scenario[]
   transitions: Transition[]
   sources: string[]

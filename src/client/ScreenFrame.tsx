@@ -53,6 +53,7 @@ function LiveScreenFrame({
     }
   }, [budgeted, visible])
   const mounted = visible && slot
+  const replayViewport = !scenario.url && !ready ? scenario.replayViewport : undefined
   // Failures are listed in the explorer's Issues panel with the screen they came from.
   useEffect(() => (error ? reportPreviewIssue(id, error) : undefined), [id, error])
   useEffect(() => {
@@ -161,7 +162,7 @@ function LiveScreenFrame({
           tabIndex={compact ? -1 : 0}
           aria-hidden={compact || undefined}
           className={compact ? "screen-thumbnail__frame" : "screen-live-frame"}
-          style={compact ? { transform: `scale(${scale})` } : undefined}
+          style={{ ...(compact ? { transform: `scale(${scale})` } : {}), ...(replayViewport ? { width: replayViewport.width, height: replayViewport.height } : {}) }}
         />
       )}
       {!ready && visible && (

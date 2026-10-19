@@ -106,6 +106,16 @@ function JobStatus({ state }: { state: ExplorerState }) {
         <span>{crawl.status === "error" ? "Exploring failed" : "Capture failed"}</span>
       </div>
     )
+  const replayFailures = Number(crawl.progress?.failedReplays ?? (crawl.status === "idle" ? state.crawlStats?.failedReplays : 0) ?? 0)
+  const stoppedBy = crawl.progress?.stoppedBy ?? (crawl.status === "idle" ? state.crawlStats?.stoppedBy : undefined)
+  const limited = stoppedBy === "time-budget" || stoppedBy === "max-states"
+  if (replayFailures > 0 || limited)
+    return (
+      <div className="design-job design-job--error" role="status" aria-label="Exploration incomplete" title="The catalog may be missing screens. Inspect failed replays or increase the crawl limits and explore again.">
+        <WarningCircle size={16} aria-hidden="true" />
+        <span>{replayFailures > 0 ? `${replayFailures} replay ${replayFailures === 1 ? "failure" : "failures"}` : stoppedBy === "time-budget" ? "Time limit reached" : "State limit reached"}</span>
+      </div>
+    )
   return null
 }
 

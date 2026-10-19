@@ -179,6 +179,7 @@ export function createExplorer(init: ExplorerInit) {
       capabilities: { figmaImports: 1 },
       revision: revision(),
       generatedAt: generated?.generatedAt,
+      crawlStats: generated?.stats,
       scenarios: visible(),
       transitions: [...(options.transitions ?? [])] as Transition[],
       sources: sources().map((file) => `${project}/${file}`),

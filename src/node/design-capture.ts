@@ -53,7 +53,7 @@ export async function captureDesigns(options: CaptureDesignsOptions): Promise<De
     await page.addInitScript(() => {
       ;(window as unknown as { __UIX_FORCE?: boolean }).__UIX_FORCE = true
     })
-    await page.setViewportSize({ width: options.widths[0], height })
+    await page.setViewportSize(options.scenario.replayViewport ?? { width: options.widths[0], height })
     await page.goto(new URL(previewPath(options.scenario, options.startPath), options.baseUrl).toString(), {
       waitUntil: "domcontentloaded",
     })

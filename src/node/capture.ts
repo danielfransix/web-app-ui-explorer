@@ -2,7 +2,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { chromium } from "playwright"
 import { previewPath, STATUS_ATTRIBUTE } from "../shared/preview"
-import type { Scenario } from "../shared/types"
+import type { Scenario, UixRuntime } from "../shared/types"
 
 // One JPEG per scenario, taken from the same preview page the explorer embeds. A manifest records the
 // revision of the app the images came from, so the explorer can ignore them as soon as the source changes.
@@ -94,6 +94,7 @@ export async function capture(options: CaptureOptions): Promise<ThumbnailManifes
         const scenario = targets[next++]
         const page = await context.newPage()
         try {
+          if (scenario.replayViewport) await page.setViewportSize(scenario.replayViewport)
           await page.goto(new URL(previewPath(scenario, options.startPath), options.baseUrl).toString(), {
             waitUntil: "domcontentloaded",
           })
@@ -107,6 +108,10 @@ export async function capture(options: CaptureOptions): Promise<ThumbnailManifes
             STATUS_ATTRIBUTE,
           )
           if (status !== "ready") throw new Error(status.replace(/^error:\s*/, "") || "The preview did not start")
+          if (scenario.replayViewport) {
+            await page.setViewportSize(VIEWPORT)
+            await page.evaluate(() => (window as Window & { __uix?: UixRuntime }).__uix!.settle(150, 1500))
+          }
           await page.waitForTimeout(250) // let entrance animations finish
           const file = `${scenario.id}.jpg`
           await page.screenshot({ path: path.join(options.outDir, file), type: "jpeg", quality: 82 })

@@ -36,6 +36,8 @@ export type Scenario = {
   kind?: "screen" | "navigation" | "overlay" | "variant"
   /** Where the preview starts. Defaults to the file's `startPath`. */
   startPath?: string
+  /** Viewport used to discover the recipe. Reach its state at this size before responsive resizing. */
+  replayViewport?: { width: number; height: number }
   /** A complete preview URL for hosts that render scenarios themselves. Overrides the recipe route. */
   url?: string
   /** Best-guess source file (repo-relative). Used to place the state in the source explorer. */
@@ -92,6 +94,8 @@ export type Candidate = {
   action: Action
   label: string
   role: string
+  /** Same-origin link destination, used to prioritise pages not yet visited. */
+  destination?: string
   /** Looks like it moves a flow forward (Continue, Save, Next ...). */
   primary: boolean
 }
@@ -100,12 +104,19 @@ export type ReplayResult =
   | { ok: true }
   | { ok: false; step: number; message: string }
 
+export type ReplayOptions = { timeoutMs?: number; settleMs?: number }
+export type ReplayStatus = { id: string; step: number; result?: ReplayResult }
+
 export type AutofillResult = { actions: Action[]; filled: number }
 
 /** The browser runtime's public surface, available as `window.__uix`. */
 export type UixRuntime = {
   version: number
-  replay(actions: Action[], options?: { timeoutMs?: number; settleMs?: number }): Promise<ReplayResult>
+  replay(actions: Action[], options?: ReplayOptions): Promise<ReplayResult>
+  /** Starts a job whose status can be observed again after a document navigation. */
+  startReplay(id: string, actions: Action[], options?: ReplayOptions): void
+  replayStatus(): ReplayStatus | undefined
+  cancelReplay(): void
   settle(quietMs?: number, maxMs?: number): Promise<void>
   snapshot(): Snapshot
   candidates(options?: { deny?: string[] }): Candidate[]
