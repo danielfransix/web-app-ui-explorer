@@ -28,7 +28,7 @@ import {
   useExplorerState,
   type ExplorerState,
 } from "./data"
-import ScreenFrame from "./ScreenFrame"
+import ScreenFrame, { CompactPreviewActivity } from "./ScreenFrame"
 import FolderNavigator from "./FolderNavigator"
 import ScreenPicker from "./ScreenPicker"
 import ScreenLightbox from "./ScreenLightbox"
@@ -695,7 +695,7 @@ function Loaded({ data }: { data: ExplorerState }) {
   }, [])
   return (
     <>
-      {workbench}
+      <CompactPreviewActivity.Provider value={!previewScenario}>{workbench}</CompactPreviewActivity.Provider>
       {previewScenario && (
         <ScreenLightbox
           key={data.revision}

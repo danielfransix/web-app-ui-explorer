@@ -242,6 +242,8 @@ test("gallery modal receives destination readiness and remains interactive after
     await page.goto(base + "/inspect/?view=gallery")
     await page.getByRole("checkbox").first().click()
     await page.getByRole("button", { name: "Expand Completed workflow", exact: true }).click()
+    await page.getByRole("dialog").waitFor()
+    assert.equal(await page.locator("iframe.screen-thumbnail__frame").count(), 0, "background thumbnail apps must not navigate while a live preview is active")
     const frame = page.getByRole("dialog").frameLocator(".screen-preview-entry:not([hidden]) iframe")
     await frame.locator('html[data-uix-status="ready"]').waitFor({ timeout: 25_000 })
     assert.equal(await frame.locator("#value").innerText(), "Alex")
@@ -249,6 +251,9 @@ test("gallery modal receives destination readiness and remains interactive after
     await frame.getByRole("button", { name: "Open dialog", exact: true }).click()
     assert.equal(await frame.locator("dialog").isVisible(), true)
     if (process.env.UIX_SCREENSHOT_DIR) await page.screenshot({ path: path.join(process.env.UIX_SCREENSHOT_DIR, "navigation-modal.png") })
+    await page.getByRole("button", { name: "Close", exact: true }).click()
+    await page.getByRole("dialog").waitFor({ state: "hidden" })
+    await page.waitForFunction(() => document.querySelectorAll("iframe.screen-thumbnail__frame").length > 0)
   } catch (error) {
     for (const frame of page.frames()) console.log("navigation preview diagnostic", await frame.evaluate(() => ({ url: location.href, status: document.documentElement.getAttribute("data-uix-status"), replay: window.__uix?.replayStatus(), keys: Object.keys(sessionStorage).filter(key => key.startsWith("__uix:replay:v1")) })).catch(e => e.message))
     throw error

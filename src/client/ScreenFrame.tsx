@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from "react"
+import { createContext, memo, useContext, useEffect, useRef, useState } from "react"
 import { SpinnerGap } from "@phosphor-icons/react/dist/csr/SpinnerGap"
 import {
   acquirePreview,
@@ -21,6 +21,10 @@ type Props = {
   revision?: number
 }
 
+// Native iframe navigations share the tab's history. Background recipes must not traverse the
+// foreground app's history while someone inspects it. Cached images remain visible.
+export const CompactPreviewActivity = createContext(true)
+
 function LiveScreenFrame({
   scenario,
   compact = false,
@@ -29,6 +33,7 @@ function LiveScreenFrame({
 }: Props) {
   const { id, title } = scenario
   const budgeted = compact
+  const active = useContext(CompactPreviewActivity)
   const root = useRef<HTMLDivElement>(null)
   const frame = useRef<HTMLIFrameElement>(null)
   const [scale, setScale] = useState(0.25)
@@ -39,7 +44,7 @@ function LiveScreenFrame({
   const [slot, setSlot] = useState(!budgeted)
   useEffect(() => {
     if (!budgeted) return
-    if (!visible) {
+    if (!visible || !active) {
       releasePreview(owner.current)
       setSlot(false)
       return
@@ -51,8 +56,8 @@ function LiveScreenFrame({
       unsubscribe()
       releasePreview(owner.current)
     }
-  }, [budgeted, visible])
-  const mounted = visible && slot
+  }, [budgeted, visible, active])
+  const mounted = visible && slot && (!budgeted || active)
   const replayViewport = !scenario.url && !ready ? scenario.replayViewport : undefined
   // Failures are listed in the explorer's Issues panel with the screen they came from.
   useEffect(() => (error ? reportPreviewIssue(id, error) : undefined), [id, error])

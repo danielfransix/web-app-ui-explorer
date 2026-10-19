@@ -88,10 +88,18 @@ The connection name is the primary heading (14px/600); the generic panel heading
 
 Refinement validation: build/typecheck and all five connection tests passed, including keyboard/touch/pin behavior and a long multi-step sequence at 320px. PaidHR hover, pin, zoom, close, filtering and responsive checks passed at 320/390/768/1440px with no browser errors. Rendered desktop/mobile screenshots were reviewed for hierarchy, alignment and wrapping.
 
-## Release 0.5.3
+## Release 0.5.4
 
 This release includes the optional connection evidence model, captured control/action summaries, backward-compatible legacy interpretation, hover/pin inspection, action-sentence hierarchy and the foreground-only hover refinements. Publication uses the repository's version-tag workflow, which builds both package and plugin, runs tests, and publishes to npm. The plan ships with the package alongside its README.
 
-Pre-release validation passed: package typecheck/build, plugin typecheck/build, package-content inspection and the full suite (159 tests, 158 passed, no failures, one skip because OpenSSL is unavailable). An earlier full run had one navigation-modal replay timeout; the isolated case and full rerun passed without changing the test or implementation. The release workflow provides a separate clean-environment check before publication.
+The initial pre-release validation passed: package typecheck/build, plugin typecheck/build, package-content inspection and a full suite rerun. An earlier run had one navigation-modal replay timeout; the isolated case and full rerun passed without changing the test or implementation. The release workflow then reproduced the problem, as described below.
+
+The attempted `v0.5.3` release was blocked by CI before npm publication because the navigation-modal failure recurred. An instrumented browser reproduction identified its cause: one background thumbnail called `history.back()`, and Chromium traversed a different iframe's history in the same tab. The foreground replay consequently resumed on the wrong document. The trace and reproduction are retained locally in ignored QA artifacts.
+
+Opening a screen preview now suspends live background thumbnails through shared preview activity context. Cached images remain visible, preview budget slots are released, and live fallback thumbnails resume when the preview closes. This applies to both gallery and canvas without changing captured replay recipes or the host app's history API. The regression test first failed with eight active background frames, then passed with those frames suspended, the destination interactive, and thumbnail activity restored after closing.
+
+This correction applies [8 · Treat the experience as a whole](https://app.notion.com/p/3fd964279f8d81929a2dec91a30a3737) by resolving the shared thumbnail behavior, and [10 · Check every state and related screen](https://app.notion.com/p/3fd964279f8d811dbe0bff1648d85946) through the real multi-frame navigation case. It does not introduce a new canonical rule. The existing `v0.5.3` tag is preserved; `v0.5.4` carries the correction.
+
+The corrected preview passed nine consecutive focused runs. The final 0.5.4 typecheck/build and full suite passed: 159 tests, 158 passed, zero failures, one OpenSSL-dependent skip (161.68 seconds). No timeouts or assertions were weakened.
 
 After the Explorer repository and npm release are pushed, the consumer rollout updates the PaidHR marketing source app first, then Design Team Web App V3. Both use the registry release and updated lockfiles. Existing local guidance, test updates and Explorer configuration are included in their reviewed commits. PaidHR web-app is explicitly excluded: its original `develope` branch and pending changes are preserved, with no dependency update, commit or push for that repository.
