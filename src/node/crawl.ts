@@ -5,6 +5,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { chromium, type BrowserContext, type Page } from "playwright"
 import { replayPage } from "./replay"
+import { candidateStep, recipeStep } from "../shared/transitions"
 import type {
   Action,
   AutofillResult,
@@ -14,6 +15,7 @@ import type {
   Scenario,
   Snapshot,
   UixRuntime,
+  TransitionStep,
 } from "../shared/types"
 
 export type CrawlOptions = {
@@ -54,6 +56,7 @@ export type CrawlProgress = {
 
 type Item = {
   actions: Action[]
+  steps?: TransitionStep[]
   parentId?: string
   label: string
   /** The step that was added last, to learn which controls never lead anywhere. */
@@ -70,6 +73,7 @@ type State = {
   parentId?: string
   kind: NonNullable<Scenario["kind"]>
   actions: Action[]
+  steps?: TransitionStep[]
   snapshot: Snapshot
   key: string
   label: string
@@ -279,6 +283,7 @@ ${runtime}` })
     description: state.parentId ? `${byId.get(state.parentId)?.title} › ${state.label}` : undefined,
     parent: state.parentId,
     trigger: state.parentId ? state.label : undefined,
+    transition: state.parentId ? { steps: state.steps } : undefined,
     kind: state.kind,
     actions: state.actions,
     fingerprint: state.key,
@@ -312,6 +317,7 @@ ${runtime}` })
       parentId: parent?.id,
       kind,
       actions: item.actions,
+      steps: item.steps,
       snapshot,
       key: stateKey(snapshot),
       label: item.label,
@@ -369,6 +375,7 @@ ${runtime}` })
       for (const option of options) {
         queue.push({
           actions: [...item.actions, option.action],
+          steps: [...(item.steps ?? []), candidateStep(option)],
           parentId: item.parentId,
           label: option.label,
           via: JSON.stringify(option.action),
@@ -407,6 +414,7 @@ ${runtime}` })
       stats.candidatesTried++
       queue.push({
         actions: [...item.actions, candidate.action],
+        steps: [candidateStep(candidate)],
         parentId: state.id,
         label: candidate.label,
         // Moving the flow on depends on the state it is pressed in, so it is never written off.
@@ -425,6 +433,7 @@ ${runtime}` })
         stats.candidatesTried++
         queue.push({
           actions: [...item.actions, ...filled.actions, candidate.action],
+          steps: [...(filled.steps ?? filled.actions.map(recipeStep)), candidateStep(candidate)],
           parentId: state.id,
           label: candidate.label,
           priority: 1,
@@ -437,6 +446,7 @@ ${runtime}` })
         stats.candidatesTried++
         queue.push({
           actions: [...item.actions, ...filled.actions, candidate.action],
+          steps: [...(filled.steps ?? filled.actions.map(recipeStep)), candidateStep(candidate)],
           parentId: state.id,
           label: candidate.label,
           via: JSON.stringify(["filled", candidate.action]),

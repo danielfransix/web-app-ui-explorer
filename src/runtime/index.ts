@@ -13,6 +13,7 @@ import type {
   ReplayResult,
   Snapshot,
   UixRuntime,
+  TransitionStep,
 } from "../shared/types"
 
 // Runs inside the app being explored. It is the one place that decides how a recipe step finds its
@@ -1019,9 +1020,18 @@ function unchosenRadios(): Element[] {
 /** Fills every empty field and makes a first choice in every empty dropdown and radio group. */
 async function autofill(): Promise<AutofillResult> {
   const actions: Action[] = []
+  const steps: TransitionStep[] = []
   const done = new Set<string>()
-  const remember = (action: Action) => {
+  const describe = (action: Action, element: Element): TransitionStep => ({
+    type: action.kind,
+    role: roleOf(element),
+    label: action.kind === "fill"
+      ? element.getAttribute("aria-label") || normalized((element as HTMLInputElement).labels?.[0]?.textContent) || element.getAttribute("placeholder") || "Input field"
+      : labelOf(element),
+  })
+  const remember = (action: Action, step: TransitionStep) => {
     actions.push(action)
+    steps.push(step)
     done.add(JSON.stringify(action))
   }
   for (let round = 0; round < 40; round++) {
@@ -1031,8 +1041,9 @@ async function autofill(): Promise<AutofillResult> {
     })
     if (!field) break
     const action = actionFor(field, "fill", guessValue(field))!
+    const step = describe(action, field)
     perform(action, field)
-    remember(action)
+    remember(action, step)
     await settle(60, 400)
   }
   for (let round = 0; round < 20; round++) {
@@ -1042,6 +1053,7 @@ async function autofill(): Promise<AutofillResult> {
     })
     if (!trigger) break
     let open = actionFor(trigger, "click")!
+    const openingStep = describe(open, trigger)
     pressElement(trigger as HTMLElement)
     await settle(80, 600)
     if (!popupOptions().length) {
@@ -1064,6 +1076,7 @@ async function autofill(): Promise<AutofillResult> {
     if (!option) continue
     pressElement(option as HTMLElement)
     actions.push(open, first.action)
+    steps.push(openingStep, { type: "select", label: first.label, role: first.role })
     await settle(80, 600)
   }
   for (let round = 0; round < 20; round++) {
@@ -1073,11 +1086,12 @@ async function autofill(): Promise<AutofillResult> {
     })
     if (!radio) break
     const action = actionFor(radio, "click")!
+    const step = describe(action, radio)
     pressElement(radio as HTMLElement)
-    remember(action)
+    remember(action, step)
     await settle(60, 400)
   }
-  return { actions, filled: actions.length }
+  return { actions, filled: actions.length, steps }
 }
 
 // ---- Preview pages ----------------------------------------------------------------------------------

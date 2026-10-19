@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react"
 import type { CrawlStats, Scenario, Transition } from "../shared/types"
+import { canvasConnections } from "../shared/transitions"
 
 // The explorer's data comes from the Vite plugin's API and stays current through server-sent events:
 // scenarios, thumbnails and running jobs all change while the page is open.
@@ -129,14 +130,5 @@ export const isState = (scenario: Scenario) =>
 
 /** Connections drawn on the canvas: parent links, plus any the project declares. */
 export function connections(scenarios: Scenario[], declared: Transition[]): Transition[] {
-  const ids = new Set(scenarios.map((scenario) => scenario.id))
-  const fromParents = scenarios
-    .filter((scenario) => scenario.parent && ids.has(scenario.parent))
-    .map((scenario) => ({
-      source: scenario.parent!,
-      target: scenario.id,
-      label: scenario.trigger,
-    }))
-  const seen = new Set(fromParents.map((edge) => `${edge.source}>${edge.target}`))
-  return [...fromParents, ...declared.filter((edge) => !seen.has(`${edge.source}>${edge.target}`))]
+  return canvasConnections(scenarios, declared)
 }

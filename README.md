@@ -207,6 +207,25 @@ export default defineConfig({
 
 With the Vite plugin the same options go to `uiExplorer({ ... })` and `serve` is not used.
 
+### Inspecting canvas connections
+
+Every connection has a compact label. Hover or focus it to read the action details; click, Enter or Space pins the panel. Close or Escape dismisses it. Pinned details stay readable while the canvas pans or zooms. They show the source and destination plus recorded actions such as **Click the “Get the app” link**. New crawls retain control roles and intermediate form/dropdown steps. Older recipes show the information that can be recovered, and missing trigger types are identified explicitly. Filled values and CSS selectors are excluded from the details.
+
+For connections defined by the project, optional `details` can describe one or more actions, including automatic or custom events:
+
+```js
+transitions: [{
+  source: "home",
+  target: "download",
+  label: "Get the app",
+  details: {
+    steps: [{ type: "click", role: "link", label: "Get the app" }],
+  },
+}]
+```
+
+Steps support `type`, `label`, `role` and `description`; `details.description` adds context for the connection. Use `type: "automatic"` only when the project defines that behavior. A scenario's optional `transition` carries the same details for its `parent` connection. See the [implementation plan and QA](docs/connection-details-plan.md).
+
 ### Shipping it with a build
 
 By default the explorer exists only next to your dev server. After any bundler's production build, run

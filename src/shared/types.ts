@@ -32,6 +32,8 @@ export type Scenario = {
   actions?: Action[]
   /** The control pressed to get here from the parent. Labels the edge on the canvas. */
   trigger?: string
+  /** Human action evidence for the connection from `parent`; excludes filled values and selectors. */
+  transition?: TransitionDetails
   /** How this state differs from its parent. */
   kind?: "screen" | "navigation" | "overlay" | "variant"
   /** Where the preview starts. Defaults to the file's `startPath`. */
@@ -50,8 +52,17 @@ export type Scenario = {
   hidden?: boolean
 }
 
+/** Human evidence for one action in a connection, separate from its replay recipe. */
+export type TransitionStep = {
+  /** Extensible event name, e.g. click, fill, select, hover, key, submit or automatic. */
+  type: string
+  label?: string
+  role?: string
+  description?: string
+}
+export type TransitionDetails = { description?: string; steps?: TransitionStep[] }
 /** A connection between two screens that is not a parent link, for example "Continue". */
-export type Transition = { source: string; target: string; label?: string }
+export type Transition = { source: string; target: string; label?: string; details?: TransitionDetails }
 
 export type ScenariosFile = {
   version: 1
@@ -107,7 +118,7 @@ export type ReplayResult =
 export type ReplayOptions = { timeoutMs?: number; settleMs?: number }
 export type ReplayStatus = { id: string; step: number; result?: ReplayResult }
 
-export type AutofillResult = { actions: Action[]; filled: number }
+export type AutofillResult = { actions: Action[]; filled: number; steps?: TransitionStep[] }
 
 /** The browser runtime's public surface, available as `window.__uix`. */
 export type UixRuntime = {

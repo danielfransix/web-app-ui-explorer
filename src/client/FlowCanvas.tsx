@@ -15,6 +15,7 @@ import {
   Handle,
   Position,
   BaseEdge,
+  EdgeLabelRenderer,
   MarkerType,
   useNodesState,
   useReactFlow,
@@ -33,6 +34,9 @@ import { Minus } from "@phosphor-icons/react/dist/csr/Minus"
 import { ArrowCounterClockwise } from "@phosphor-icons/react/dist/csr/ArrowCounterClockwise"
 import { Button, Tooltip } from "./ui"
 import type { Scenario, Transition } from "../shared/types"
+import { describeConnection, type ConnectionDescription } from "../shared/transitions"
+import { hashString } from "../shared/hash"
+import { ConnectionDetails, ConnectionLabel } from "./ConnectionDetails"
 import { folderCrumb, scenarioSource } from "./folderModel"
 import ScreenFrame from "./ScreenFrame"
 import ScreenSelect from "./ScreenSelect"
@@ -58,6 +62,7 @@ type RoutedEdge = Edge<{
   path: string
   x: number
   y: number
+  description: ConnectionDescription
 }, "elk">
 type CanvasProps = {
   scenarios: Scenario[]
@@ -122,18 +127,14 @@ function ZoomReadout() {
 function LayoutEdge(props: EdgeProps<RoutedEdge>) {
   if (!props.data) return null
   return (
+    <>
     <BaseEdge
       id={props.id}
       path={props.data.path}
       markerEnd={props.markerEnd}
-      label={props.label}
-      labelX={props.data.x}
-      labelY={props.data.y}
-      labelStyle={{ fill: "var(--color-slate-500)" }}
-      labelBgStyle={{ fill: "var(--color-white)" }}
-      labelBgPadding={[6, 4]}
-      labelBgBorderRadius={4}
     />
+    <EdgeLabelRenderer><ConnectionLabel id={props.id} detail={props.data.description} label={String(props.label)} x={props.data.x} y={props.data.y} /></EdgeLabelRenderer>
+    </>
   )
 }
 // The centre of the longest straight run of an edge. Orthogonal routes bend, so the midpoint of the
@@ -152,8 +153,11 @@ function labelAnchor(points: { x: number; y: number }[]) {
 const nodeTypes = { screen: ScreenNode }
 const edgeTypes = { elk: LayoutEdge }
 
-// Long control labels would crowd the canvas; the full text is on the card.
-const shortLabel = (label?: string) => (label && label.length > 26 ? `${label.slice(0, 25)}…` : label)
+// The line remains compact; the inspection panel retains the complete label.
+const shortLabel = (label: string) => {
+  const characters = Array.from(label)
+  return characters.length > 26 ? `${characters.slice(0, 25).join("")}…` : label
+}
 
 function Canvas(props: CanvasProps) {
   const { scenarios, onOpen } = props
@@ -163,10 +167,12 @@ function Canvas(props: CanvasProps) {
   const [busy, setBusy] = useState(true)
   const [error, setError] = useState("")
   const [revision, setRevision] = useState(0)
+  const [inspectionRevision, setInspectionRevision] = useState(0)
   const flow = useReactFlow<ScreenNodeType, RoutedEdge>()
   // The layout depends on which screens are shown, not on the identity of the array, so typing in the
   // search box or re-rendering the workbench does not trigger another layout.
-  const idKey = `${scenarios.map((s) => s.id).join("|")}#${props.connections.length}`
+  const idKey = useMemo(() => JSON.stringify([scenarios.map(s => s.id), props.connections, scenarios.map(s => [s.title, s.actions, s.transition, s.origin])]), [scenarios, props.connections])
+  const descriptions = useMemo(() => new Map(edges.map(edge => [edge.id, edge.data!.description])), [edges])
   const latest = useRef({ scenarios, flow, connections: props.connections })
   latest.current = { scenarios, flow, connections: props.connections }
   useEffect(() => {
@@ -175,9 +181,17 @@ function Canvas(props: CanvasProps) {
     let active = true
     setBusy(true)
     setError("")
+    const byId = new Map(scenarios.map(s => [s.id, s]))
+    const occurrences = new Map<string, number>()
     const connections = latest.current.connections
       .filter((edge) => ids.has(edge.source) && ids.has(edge.target))
-      .map((edge) => ({ ...edge, label: shortLabel(edge.label) }))
+      .map(edge => {
+        const description = describeConnection(edge, byId.get(edge.source), byId.get(edge.target))
+        const hash = hashString(JSON.stringify([edge.source, edge.target, description.label]))
+        const ordinal = occurrences.get(hash) ?? 0
+        occurrences.set(hash, ordinal + 1)
+        return { ...edge, id: `connection-${hash}-${ordinal}`, description, label: shortLabel(description.label)! }
+      })
     layoutEngine()
       .layout<ElkNode>({
         id: "hiring-experience",
@@ -200,14 +214,14 @@ function Canvas(props: CanvasProps) {
             { id: `${s.id}-out`, x: WIDTH, y: HEIGHT / 2, width: 1, height: 1 },
           ],
         })),
-        edges: connections.map((edge, i) => ({
-          id: `edge-${i}`,
+        edges: connections.map((edge) => ({
+          id: edge.id,
           sources: [`${edge.source}-out`],
           targets: [`${edge.target}-in`],
           labels: edge.label
             ? [
                 {
-                  id: `edge-${i}-label`,
+                  id: `${edge.id}-label`,
                   text: edge.label,
                   width: edge.label.length * LABEL_CHAR_WIDTH + LABEL_PADDING,
                   height: LABEL_HEIGHT,
@@ -235,8 +249,8 @@ function Canvas(props: CanvasProps) {
           }),
         )
         setEdges(
-          connections.flatMap((edge, i) => {
-            const routed = routes.get(`edge-${i}`)
+          connections.flatMap((edge) => {
+            const routed = routes.get(edge.id)
             const section = routed?.sections?.[0]
             if (!section) return []
             const placed = routed?.labels?.[0]
@@ -254,7 +268,7 @@ function Canvas(props: CanvasProps) {
                 : labelAnchor(points)
             return [
               {
-                id: `edge-${i}`,
+                id: edge.id,
                 type: "elk" as const,
                 source: edge.source,
                 target: edge.target,
@@ -274,6 +288,7 @@ function Canvas(props: CanvasProps) {
                     .join(" "),
                   x: middle.x,
                   y: middle.y,
+                  description: edge.description,
                 },
               },
             ]
@@ -295,8 +310,9 @@ function Canvas(props: CanvasProps) {
     }
   }, [idKey, setNodes, revision])
   return (
-    <OpenPreview.Provider value={onOpen}>
+    <OpenPreview.Provider value={(id) => { setInspectionRevision(value => value + 1); onOpen(id) }}>
       <ScreenSelection.Provider value={selection}>
+      <ConnectionDetails connections={descriptions} resetKey={inspectionRevision}>
       <section
         className="design-flow-canvas"
         aria-label="Connected screen canvas"
@@ -310,10 +326,11 @@ function Canvas(props: CanvasProps) {
           onNodesChange={onNodesChange}
           nodesDraggable={false}
           nodesConnectable={false}
+          edgesFocusable={false}
           minZoom={0.05}
           maxZoom={1.6}
           onlyRenderVisibleElements
-          onNodeDoubleClick={(_, node) => onOpen(node.id)}
+          onNodeDoubleClick={(_, node) => { setInspectionRevision(value => value + 1); onOpen(node.id) }}
           deleteKeyCode={null}
         >
           <Background
@@ -380,6 +397,7 @@ function Canvas(props: CanvasProps) {
           </div>
         )}
       </section>
+      </ConnectionDetails>
       </ScreenSelection.Provider>
     </OpenPreview.Provider>
   )

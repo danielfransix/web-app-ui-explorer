@@ -181,7 +181,7 @@ export function createExplorer(init: ExplorerInit) {
       generatedAt: generated?.generatedAt,
       crawlStats: generated?.stats,
       scenarios: visible(),
-      transitions: [...(options.transitions ?? [])] as Transition[],
+      transitions: [...(mode === "manual" ? [] : generated?.transitions ?? []), ...(options.transitions ?? [])] as Transition[],
       sources: sources().map((file) => `${project}/${file}`),
       thumbnails: manifest
         ? {

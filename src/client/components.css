@@ -43,7 +43,7 @@ button:focus-visible {
   @apply border-(length:--border-width-ui) border-border bg-canvas text-fg;
 }
 .ds-button--variant-outline:hover:not(:disabled) {
-  @apply bg-canvas-subtle text-brand;
+  @apply text-brand;
 }
 .ds-button--variant-ghost {
   @apply bg-transparent text-fg;
@@ -54,13 +54,13 @@ button:focus-visible {
 }
 .ds-button--variant-ghost:hover:not(:disabled),
 .ds-button--variant-ghost-slim:hover:not(:disabled) {
-  @apply bg-brand-subtle text-brand;
+  @apply text-brand;
 }
 .ds-button--variant-link-danger {
   @apply text-danger;
 }
 .ds-button--variant-link-danger:hover:not(:disabled) {
-  @apply bg-red-50 text-red-600;
+  @apply text-red-600;
 }
 .ds-button--variant-secondary-2 {
   @apply bg-brand-subtle text-brand;
@@ -246,5 +246,5 @@ button:focus-visible {
   @apply flex size-11 shrink-0 items-center justify-center rounded-lg border-0 bg-transparent text-fg-subtle cursor-pointer;
 }
 .drawer-close:hover {
-  @apply bg-slate-100 text-fg;
+  @apply text-brand;
 }
