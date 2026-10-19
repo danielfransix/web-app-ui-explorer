@@ -37,6 +37,8 @@ jobs:
             echo "Tag ${GITHUB_REF_NAME} does not match package version $version" >&2
             exit 1
           fi
-      - run: npm publish --provenance --access public
+      # Build and test above; publish those artifacts without repeating prepublishOnly.
+      # npm provenance supports public source repositories only.
+      - run: npm publish --ignore-scripts --provenance=${{ !github.event.repository.private }} --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
