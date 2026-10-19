@@ -174,6 +174,16 @@ test('card selections stay below thumbnails, survive browsing, and define the ex
    assert.equal(await home().isChecked(),false);assert.equal(await menu().isChecked(),true)
    await page.getByRole('button',{name:'Canvas',exact:true}).click()
    await page.locator('.design-flow-canvas[data-layout-ready="true"]').waitFor()
+   // Node layout is ready before fitView finishes animating the viewport.
+   await page.locator('.react-flow__viewport').evaluate(viewport=>new Promise(resolve=>{
+    let previous='',stableFrames=0
+    const settled=()=>{
+     const transform=getComputedStyle(viewport).transform
+     stableFrames=transform===previous?stableFrames+1:0;previous=transform
+     if(stableFrames>=4)resolve();else requestAnimationFrame(settled)
+    }
+    requestAnimationFrame(settled)
+   }))
    await checkDisclosure('canvas')
    const positions=await page.locator('.react-flow__node').evaluateAll(nodes=>nodes.map(n=>n.style.transform))
    await home().check()
