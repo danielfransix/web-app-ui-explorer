@@ -78,6 +78,16 @@ Discovery still follows reachable controls; a source folder is not a route manif
 
 Version 0.5.2 contains these changes. Publish through the repository's version-tag release workflow, which rebuilds the package and companion plugin, runs the full suite, and publishes using the repository's configured npm credential. Update both the Design Team web app and the PaidHR marketing source app to the registry release, refresh their lockfiles, and restart their Explorer servers. Consumer verification must resolve the installed version and exercise real browser previews; an HTTP response alone is insufficient.
 
+Release delivery completed on 2026-10-19:
+
+- Source commit `60ef3a4` and tag `v0.5.2` are pushed. The [release workflow](https://github.com/danielfransix/web-app-ui-explorer/actions/runs/39213241181) rebuilt the package and plugin, passed all 154 tests with no skips, and published 0.5.2. The npm registry confirms `latest: 0.5.2`.
+- Both local consumer apps now declare `^0.5.2`, resolve installed version 0.5.2 from npm, and have updated lockfiles: `Design-Team-Web-App-V3` (pnpm 10.34.3) and the nested PaidHR marketing `source` app (npm). Both production builds passed.
+- Both Explorer servers were restarted with the installed release. Final browser gallery checks show 201 registered Design Team states at port 8443 and 52 discovered PaidHR states at port 5199, with zero browser exceptions.
+- The Design Team app's 26 Explorer browser checks all passed. Its pre-upgrade baseline exposed stale URL, control and preview-layer expectations; those checks now cover the current combobox, navigation parameters, preview stack and hiring-home entry point.
+- A fresh crawl using PaidHR's installed npm package covered all 46 declared routes, recorded 52 states, and had zero failed replays in 56.2 seconds. It deliberately stopped once route coverage was complete. All 52 thumbnails were regenerated in that app's normal `.ui-explorer` catalog. Platform previews passed at 1440px and 390px, and its actual gallery modal rendered the destination with zero browser exceptions.
+
+Release evidence is retained in the package checkout's `.ui-explorer/release-0.5.2-logs/` and `.ui-explorer/release-0.5.2-*-gallery.png`. PaidHR's normal `.ui-explorer/` folder contains `release-0.5.2-qa.json`, desktop/mobile screenshots, the gallery-modal screenshot, the refreshed catalog and thumbnails. Consumer dependency and test-file changes remain local working-tree changes.
+
 The local patched review server at [http://127.0.0.1:5200/__explorer/?view=gallery](http://127.0.0.1:5200/__explorer/?view=gallery) uses the verified isolated catalog. Its API and actual gallery were checked for 52 scenarios, 52 current thumbnails, and zero browser exceptions. Select the Sites project checkbox to show all states. The screenshot is `.ui-explorer/navigation-qa/paidhr-final-gallery.png`.
 
 ## Reproduce the automated checks
