@@ -10,9 +10,6 @@
 .design-workbench-header-actions { display:flex; align-items:center; justify-content:flex-end; gap:12px; min-width:0; }
 .design-workbench-header-actions>.design-job { min-width:0; }
 .design-workbench-header-actions>.design-job>span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.design-workbench-badge {
-  @apply rounded-full border border-border px-3 py-1.5 text-xs text-fg-subtle;
-}
 .design-workbench-metrics {
   @apply flex items-center gap-8;
 }
@@ -95,7 +92,6 @@
 .design-folder-row > small { @apply shrink-0 rounded bg-slate-100 px-1.5 text-2xs text-fg-muted; }
 .design-folder-empty { @apply flex flex-1 flex-col items-center justify-center gap-3 px-8 pb-16 text-center text-slate-400; }
 .design-folder-empty h2 { @apply font-semibold text-base text-fg-subtle; }
-.design-preview-shell { @apply flex h-dvh flex-col bg-slate-100; }
 .design-preview-bar { @apply flex shrink-0 items-center gap-3 border-b border-border bg-canvas px-4 py-3; }
 .design-preview-picker { @apply min-w-0 flex-1; }
 .design-preview-picker .control { @apply mt-0 h-9; }
@@ -112,6 +108,9 @@
 .design-viewport-toolbar .control-select > svg { margin-top: 0; }
 .design-viewport-toolbar .ds-button--size-icon { @apply size-9 shrink-0; }
 .design-viewport-toolbar > .ds-button--size-sm { height:36px; }
+.design-screen-reference-fallback { flex-basis: 100%; min-width: 0; order: 1; color: var(--color-fg-muted); }
+.design-screen-reference-fallback p { margin-bottom: 8px; }
+.design-screen-reference-fallback input { width: 100%; font-family: monospace; }
 .design-viewport-divider { @apply mx-1 h-5 w-px shrink-0 bg-border; }
 .design-viewport-custom { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .design-viewport-custom label { @apply sr-only; }
@@ -170,7 +169,6 @@
 .design-lightbox-actions .ds-button--size-icon { @apply size-9; }
 .screen-live-viewport { @apply relative min-h-0 min-w-0 flex-1 bg-canvas; }
 .screen-live-frame { @apply block h-full w-full border-0; }
-.preview-recipe-error { @apply fixed left-4 top-4 z-50 max-w-lg rounded-lg border border-red-200 bg-canvas p-3 text-sm text-red-600 shadow-lg; }
 .design-flow-canvas { @apply relative mx-8 mb-8 overflow-hidden rounded-xl border border-border bg-canvas-subtle; height: max(560px, calc(100dvh - 280px)); }
 .design-flow-node { @apply h-full overflow-hidden rounded-[7.2px] border border-border bg-canvas shadow-sm; width: 336px; height: 284px; }
 .design-flow-node__title { @apply flex h-12 w-full items-center truncate px-4 text-left font-semibold text-sm; }
@@ -179,7 +177,6 @@
 .design-flow-node__caption > .design-screen-select { inset-inline-start:calc(var(--screen-caption-inset) - var(--screen-select-padding)); }
 .design-flow-overview { @apply flex flex-col items-center justify-center gap-3 bg-canvas-subtle p-8 text-center font-semibold text-lg text-slate-700; aspect-ratio: 1280 / 900; }
 .design-flow-overview small { @apply font-sans text-xs text-fg-muted; }
-.design-flow-canvas .react-flow__edge-text { @apply font-sans text-2xs; }
 .design-flow-edge-label { position:absolute; pointer-events:all; max-width:202px; min-height:24px; padding:4px 6px; border:0; border-radius:4px; background:var(--color-canvas); color:var(--color-fg-subtle); font-size:11px; line-height:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .design-flow-edge-label:is(:hover,:focus-visible), .design-flow-edge-label[data-pinned="true"] { color:var(--color-brand); }
 .design-flow-edge-label[data-pinned="true"] { text-decoration:underline; text-underline-offset:3px; }
@@ -206,15 +203,12 @@
 .design-flow-controls .ds-button--size-icon { @apply size-8; }
 .design-flow-zoom { @apply w-12 text-center text-xs text-fg-subtle; }
 .design-flow-status { @apply absolute right-5 top-5 z-10 rounded-lg border border-border bg-canvas px-4 py-3 text-sm text-fg-subtle shadow-sm; }
-.design-shortcut-hint { @apply flex items-center gap-1 text-2xs text-slate-400; }
-.design-shortcut-hint kbd { @apply rounded border border-border bg-canvas-subtle px-1.5 py-1 font-sans; }
 @media (max-width: 767px) {
   .design-workbench-toolbar { @apply flex-wrap; }
   .design-workbench-search { margin-left:0; flex-basis:100%; width:100%; max-width:none; }
   .design-workbench-search input { font-size:16px; }
   .design-search-shortcut { display:none; }
   .design-workbench-metrics { @apply gap-6; }
-  .design-workbench-badge, .design-shortcut-hint { @apply hidden; }
   .design-workbench-layout { @apply flex-col; }
   /* Stacked layout: the icon sits in a 40px button inset by px-3, so its left edge is 12px + 10px. */
   .design-workbench-header { padding-left:20px; padding-right:20px; }
@@ -248,7 +242,6 @@
 .design-origin-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:0 12px; padding:12px 0; border-top:1px solid var(--color-slate-300); }
 .design-origin-metrics strong { font-size:18px; line-height:24px; }
 .design-origin-metrics span { font-size:10px; line-height:16px; }
-.design-workspace-hint { margin:14px 0 0; font-size:11px; line-height:18px; color:var(--color-fg-subtle); }
 .design-workspace-actions { display:grid; gap:10px; padding-top:16px; border-top:1px solid var(--color-border); }
 .design-workspace-shortcuts { display:grid; gap:8px; font-size:11px; color:var(--color-fg-subtle); }
 .design-workspace-shortcuts summary { display:flex; align-items:center; gap:8px; padding:6px 0; cursor:pointer; }

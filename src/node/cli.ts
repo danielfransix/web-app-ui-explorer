@@ -8,6 +8,7 @@ import { crawl } from "./crawl"
 import { init } from "./init"
 import { installAgentGuidance } from "./agent-guidance"
 import { runMcpServer } from "./mcp"
+import { installProjectMcp } from "./mcp-install"
 import { startBridge } from "./bridge"
 import { computeRevision } from "./revision"
 import { normaliseTarget, serve } from "./serve"
@@ -26,6 +27,7 @@ Usage
   web-app-ui-explorer crawl --url <server> ...   Explore the running app and write its scenarios
   web-app-ui-explorer capture --url <server> ... Take thumbnails of the scenarios
   web-app-ui-explorer mcp --root <dir> ...       Run the MCP server exposing scanned screens to an agent (stdio)
+  web-app-ui-explorer mcp install --client <vscode|codex>  Install MCP in this project's configuration only
   web-app-ui-explorer bridge --root <dir>       Connect the companion Figma plugin to MCP (loopback port 5198)
 
 Options for init
@@ -75,12 +77,19 @@ Options for capture
   --concurrency <n>      Browsers working at once (default 4)
 
 Options for mcp
-  --root <dir>           Project root to read scanned screens from (default .)
+  --root <dir>           Project root; server working directory must match (default .)
   --base-url <url>       The target app's reachable dev server, required for captures and exports
   --start <path>         Where every recipe starts (default /)
   --route <path>         Explorer route for discovery (default /__explorer)
   --storage-state <file> Playwright storage state for authenticated captures
   --allow-writes         Allow app requests that change data during design capture
+
+Options for mcp install
+  --client <name>        vscode (.vscode/mcp.json) or codex (.codex/config.toml), required
+  --root <dir>           App root containing the local npm dependency (default .)
+  --base-url <url>       App serving Explorer; omit for saved-catalog discovery only
+  --route <path>         Custom Explorer route (default /__explorer)
+  No global installation is supported. Restart your MCP client after setup.
 
 Options for bridge
   --root <dir>           Target app root (connection saved under .ui-explorer, default .)
@@ -136,6 +145,21 @@ async function main() {
   }
 
   if (command === "mcp") {
+    if (flags.has("global")) throw new Error("Global MCP installation is not supported. Install separately in each project.")
+    const supported = new Set(positional[1] === "install"
+      ? ["client", "root", "base-url", "route"]
+      : ["root", "base-url", "start", "route", "storage-state", "allow-writes"])
+    const unknown = [...flags.keys()].filter(flag => !supported.has(flag))
+    if (unknown.length) throw new Error(`Unknown MCP option: ${unknown.map(flag => `--${flag}`).join(", ")}. Run ui-explorer mcp --help for supported options.`)
+    if (positional[1] === "install") {
+      const client = one("client")
+      if (client !== "vscode" && client !== "codex") throw new Error("Choose --client vscode or --client codex. MCP installation is project-local only.")
+      const result = installProjectMcp({ root, client, baseUrl: one("base-url"), route: one("route") })
+      installAgentGuidance(root, line => console.log(line))
+      console.log(`${result.changed ? "Installed" : "Already installed"}: ${result.file}\nRestart your MCP client in this project. Verify explorer_catalog.project.root before using screens. Project configuration must be trusted by your client.`)
+      return
+    }
+    if (positional[1]) throw new Error("Unknown MCP subcommand. Use `mcp` or `mcp install`.")
     await runMcpServer({ root, baseUrl: one("base-url"), startPath: one("start"), route: one("route"), storageState: one("storage-state"), allowWrites: flags.has("allow-writes") })
     return
   }

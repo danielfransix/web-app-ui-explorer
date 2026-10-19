@@ -22,6 +22,8 @@ export type Action =
 /** A named, repeatable state of the app: where it starts and the steps that reach it. */
 export type Scenario = {
   id: string
+  /** Optional stable identity anchor for integrations that rename their internal scenario keys. */
+  identityKey?: string
   title: string
   /** The screen this state belongs to. States share their base screen's group. */
   group: string

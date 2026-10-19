@@ -15,6 +15,8 @@ export type JobState = {
 
 export type ExplorerState = {
   project: string
+  projectId?: string
+  identities?: { version: 1; projectId: string; screens: Record<string, string> }
   startPath: string
   route: string
   mode: string
@@ -105,6 +107,7 @@ export function connect() {
 
 export const getState = () => state
 export const useExplorerState = () => useSyncExternalStore(subscribe, () => state)
+export const useScreenId = (scenarioId: string) => useSyncExternalStore(subscribe, () => state?.identities?.screens[scenarioId])
 export const useExplorerFailure = () => useSyncExternalStore(subscribe, () => failure)
 // Cards care about capture/source changes, not each crawler progress tick.
 export function useThumbnailUpdates() {

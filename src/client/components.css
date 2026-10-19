@@ -62,9 +62,6 @@ button:focus-visible {
 .ds-button--variant-link-danger:hover:not(:disabled) {
   @apply text-red-600;
 }
-.ds-button--variant-secondary-2 {
-  @apply bg-brand-subtle text-brand;
-}
 .ds-button:disabled {
   @apply opacity-50 cursor-not-allowed;
 }
@@ -232,7 +229,6 @@ button:focus-visible {
   line-height:19px;
 }
 .modal-section { display:grid; gap:12px; min-width:0; }
-.modal-section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .modal-section-title { margin:0; color:var(--color-fg); font-size:var(--dialog-section-size); font-weight:600; line-height:22px; }
 .modal-field { display:grid; gap:8px; min-width:0; }
 .modal-field-label { font-size:var(--dialog-label-size); font-weight:600; line-height:18px; }

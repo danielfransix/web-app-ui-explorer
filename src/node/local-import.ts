@@ -1,14 +1,14 @@
 import path from "node:path"
 import { randomUUID } from "node:crypto"
 import { z } from "zod"
-import { listScenarios } from "./query"
 import { captureDesigns } from "./design-capture"
 import { buildPlan, orderComponents } from "../shared/plan"
 import { hashString } from "../shared/hash"
-import type { Scenario, DesignCapture } from "../shared/types"
+import type { Scenario, DesignCapture, Transition } from "../shared/types"
 import type { BridgeCommand, BridgeResult, ImportProgress, ImportRequest } from "../shared/bridge"
+import type { ScreenIdentities } from "./screen-identities"
 
-export type LocalProject = { root: string; baseUrl?: string; startPath?: string; route?: string; storageState?: string; allowWrites?: boolean }
+export type LocalProject = { root: string; baseUrl?: string; startPath?: string; route?: string; storageState?: string; allowWrites?: boolean; expectedProjectId?: string }
 export const placementSchema = z.object({ mode: z.enum(["current-page", "page", "section", "per-folder"]), name: z.string().trim().min(1).optional(), nodeId: z.string().optional(), container: z.string().trim().min(1).max(160).optional() })
 export const layoutSchema = z.object({ mode: z.enum(["horizontal", "grid"]), columns: z.number().int().min(1).max(20).optional(), gap: z.number().int().min(0).max(1000).optional() })
 export const librarySchema = z.object({ components: z.record(z.string(), z.object({ key: z.string(), set: z.boolean().optional() })).optional(), paintStyleKeys: z.array(z.string()).optional(), textStyleKeys: z.array(z.string()).optional() })
@@ -18,20 +18,32 @@ const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0
 const normalized = (value: string) => value.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/+$/, "")
 export function selectScreens(all: Scenario[], filters: { folder?: string; group?: string; ids?: string[]; kind?: Scenario["kind"] } = {}) {
   const folder = filters.folder && normalized(filters.folder)
-  const selected = all.filter(s => (!folder || normalized(s.source ?? "").startsWith(folder + "/")) && (!filters.group || s.group === filters.group) && (!filters.kind || s.kind === filters.kind) && (!filters.ids || filters.ids.includes(s.id)))
+  const requested = filters.ids && new Set(filters.ids)
+  const selected = all.filter(s => (!folder || normalized(s.source ?? "").startsWith(folder + "/")) && (!filters.group || s.group === filters.group) && (!filters.kind || (s.kind ?? "screen") === filters.kind) && (!requested || requested.has(s.id)))
     .sort((a, b) => compare(normalized(a.source ?? ""), normalized(b.source ?? "")) || compare(a.id, b.id))
-  if (filters.ids?.some(id => !selected.some(s => s.id === id))) throw new Error("Some requested screen IDs do not exist in the selected scope. Refresh the source list.")
+  const found = new Set(selected.map(s => s.id))
+  if (filters.ids?.some(id => !found.has(id))) throw new Error("Some requested screen IDs do not exist in the selected scope. Refresh the source list.")
   return selected
 }
-export async function projectScenarios(options: LocalProject): Promise<Scenario[]> {
-  if (!options.baseUrl) return listScenarios(options.root)
+export async function projectState(options: LocalProject): Promise<{ scenarios: Scenario[]; transitions: Transition[]; startPath?: string; revision?: string; generatedAt?: string; identities?: ScreenIdentities }> {
+  if (!options.baseUrl) {
+    const { createExplorer } = await import("./core/explorer")
+    const explorer = createExplorer({ root: options.root })
+    try { return explorer.state() }
+    finally { await explorer.dispose() }
+  }
   const response = await fetch(new URL(`${options.route ?? "/__explorer"}/api/state`, options.baseUrl), { signal: AbortSignal.timeout(10_000) })
   if (!response.ok) throw new Error(`Explorer discovery failed: HTTP ${response.status}. Check the running app URL.`)
-  const data = await response.json() as { scenarios: Scenario[] }
+  const data = await response.json() as { scenarios: Scenario[]; transitions?: Transition[]; startPath?: string; projectId?: string; revision?: string; generatedAt?: string; identities?: ScreenIdentities }
+  if (options.expectedProjectId && data.projectId !== options.expectedProjectId)
+    throw new Error(data.projectId ? "The Explorer URL belongs to another project checkout. Correct --base-url before continuing." : "The Explorer server has no project identity. Update its installed package and restart it before using MCP live discovery or capture.")
   if (!Array.isArray(data.scenarios)) throw new Error("The app URL did not return a UI Explorer catalog.")
   const seen = new Set<string>()
   for (const s of data.scenarios) { if (!s.id || seen.has(s.id)) throw new Error("The catalog contains missing or duplicate screen IDs."); seen.add(s.id) }
-  return data.scenarios
+  return { ...data, transitions: data.transitions ?? [] }
+}
+export async function projectScenarios(options: LocalProject): Promise<Scenario[]> {
+  return (await projectState(options)).scenarios
 }
 export function sourceFolders(scenarios: Scenario[]) {
   const counts = new Map<string, number>()

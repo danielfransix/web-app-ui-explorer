@@ -10,7 +10,6 @@ import type {
   DesignNode,
   DesignShadow,
   DesignStroke,
-  ReplayResult,
   Snapshot,
   UixRuntime,
   TransitionStep,

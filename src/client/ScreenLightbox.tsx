@@ -5,6 +5,8 @@ import { ArrowRight } from "@phosphor-icons/react/dist/csr/ArrowRight"
 import { ArrowSquareOut } from "@phosphor-icons/react/dist/csr/ArrowSquareOut"
 import { ArrowCounterClockwise } from "@phosphor-icons/react/dist/csr/ArrowCounterClockwise"
 import CopyMenu from "./CopyMenu"
+import CopyScreenId from "./CopyScreenId"
+import { useScreenId } from "./data"
 import FigmaExport from "./FigmaExport"
 import { addCustomWidth, useCustomWidths } from "./customWidths"
 import ScreenPicker from "./ScreenPicker"
@@ -74,6 +76,7 @@ export default function ScreenLightbox({
   onClose,
   onOpenLive,
 }: Props) {
+  const screenId = useScreenId(scenario.id)
   const stageObserver = useRef<ResizeObserver | null>(null)
   const customWidths = useCustomWidths()
   const [available, setAvailable] = useState<ViewportSize>({ width: 0, height: 0 })
@@ -179,6 +182,7 @@ export default function ScreenLightbox({
             </Tooltip>
           </>
         )}
+        {screenId && <CopyScreenId key={screenId} screenId={screenId} />}
         <span className="design-viewport-divider" aria-hidden="true" />
         <Select
           aria-label="Preview viewport"

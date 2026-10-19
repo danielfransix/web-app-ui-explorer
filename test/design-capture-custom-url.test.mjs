@@ -9,7 +9,7 @@ import uiExplorer from "../dist/node/vite.js"
 import { createServer as createHttpServer } from "node:http"
 
 test('capture waits for a visible loading fallback even when replay and network activity have settled', {timeout:15000},async()=>{
- const server=createHttpServer((req,res)=>{res.setHeader('Content-Type','text/html');res.end(`<!doctype html><body>
+ const server=createHttpServer((_req,res)=>{res.setHeader('Content-Type','text/html');res.end(`<!doctype html><body>
  <div id="screen" data-uix-loading aria-busy="true">Loading role…</div>
  <div data-uix-loading hidden>Hidden loading indicator</div>
  <script>

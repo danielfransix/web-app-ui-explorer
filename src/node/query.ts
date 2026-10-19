@@ -1,9 +1,8 @@
 import { createExplorer } from "./core/explorer"
 import type { Scenario } from "../shared/types"
 
-// The shared query core behind every data-access surface (MCP tools, and any future HTTP/CLI front end):
-// one implementation of "what scenarios match this scope", so they can never drift apart. Works from the
-// manifest `createExplorer` already reads from disk - no dev server needs to be running for any of this.
+// Public Node API for querying a saved manifest without a dev server. Live MCP discovery uses
+// projectState and selectScreens instead, so live-only registered scenarios are included there.
 
 export type QueryFilters = {
   group?: string

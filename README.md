@@ -333,15 +333,24 @@ that button. A manual paste field is also available. It creates editable frames,
 linked paint/text styles. The built plugin is included under `figma-plugin/` in the npm package; import
 its `manifest.json` through Figma desktop's development-plugin menu.
 
-For MCP clients, open Explorer's workspace menu, then **Figma connection**, and paste its URL into the
-plugin's **Advanced connection**. Configure the client to launch
-`web-app-ui-explorer mcp --root <app-root> --base-url <dev-url>` using the same app root.
-Tools list folders, groups and all scenario kinds, count scenario/width pairs, capture designs, check
+For MCP clients, install the package locally and run
+`npx ui-explorer mcp install --client vscode --base-url <dev-url>` inside the app (use `--client codex`
+for Codex). This writes project-local configuration and agent guidance; global MCP installation is
+unsupported. Restart the client in this project. The server verifies its working directory, available
+client workspace roots, and the running Explorer's checkout identity before using live screens.
+Seven tools list folders, groups and all scenario kinds, count scenario/width pairs, capture designs, check
 the plugin connection, and export a selected scope with explicit placement. Keep Figma and the plugin
 open during a batch. Existing frames are updated without duplicates, and edit conflicts are reported.
 The plugin separately shows connected MCP clients and import progress. No special trigger is needed
 once the MCP server is enabled and the plugin is connected. See the
 [MCP-to-Figma setup guide](docs/mcp-figma.md) for configuration, tool arguments and troubleshooting.
+
+To ask an agent about one exact screen, expand its preview and use **Copy screen ID**. Explorer
+generates a random UUID for each screen, so identical titles and folders remain distinct. Paste that
+ID into your question; the agent resolves it with `explorer_inspect_screen`. Commit the generated
+`ui-explorer.ids.json` file to preserve IDs across restarts and teammates' clones. UUIDs are independent
+of framework, screen names and folders; [identity rules and migration](docs/mcp-figma.md#screen-ids-and-references)
+explain what happens when discovery keys or replay recipes change.
 
 See [plugin setup](figma-plugin/README.md) and [implementation status and remaining limitations](docs/figma-integration-options.md).
 

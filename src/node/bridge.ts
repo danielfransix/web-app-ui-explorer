@@ -10,8 +10,9 @@ import type { ImportProgress } from "../shared/bridge"
 import type { ImportSelection, ImportSummary } from "../shared/handoff"
 import { parseImportCode } from "../shared/handoff"
 import type { Scenario } from "../shared/types"
+import { projectIdentity } from "./project-identity"
 
-export type BridgeConnection = { url: string; token: string }
+export type BridgeConnection = { url: string; token: string; projectId?: string }
 const connectionFile = (root: string) => path.join(root, ".ui-explorer", "bridge.json")
 
 export async function startBridge(options: LocalProject & { port?: number; timeoutMs?: number; heartbeatMs?: number; agentTtlMs?: number; handoffTtlMs?: number; reconnectMs?: number; socketHeartbeatMs?: number; readClipboard?: () => Promise<string> }) {
@@ -313,7 +314,7 @@ export async function startBridge(options: LocalProject & { port?: number; timeo
     if ((error as NodeJS.ErrnoException).code !== "EADDRINUSE" || options.port) throw error
     await listen(0)
   }
-  const connection = { url: `http://localhost:${(server.address() as { port: number }).port}`, token }
+  const connection = { url: `http://localhost:${(server.address() as { port: number }).port}`, token, projectId: projectIdentity(options.root) }
   fs.mkdirSync(path.dirname(connectionFile(options.root)), { recursive: true })
   fs.writeFileSync(pairingFile, JSON.stringify({ token, port: (server.address() as { port: number }).port }), { mode: 0o600 })
   fs.writeFileSync(connectionFile(options.root), JSON.stringify(connection), { mode: 0o600 })

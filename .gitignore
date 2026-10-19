@@ -1,6 +1,8 @@
 node_modules/
 dist/
 .ui-explorer/
+ui-explorer.ids.json.lock/
+ui-explorer.ids.json.*.tmp
 *.log
 *.tgz
 .env*

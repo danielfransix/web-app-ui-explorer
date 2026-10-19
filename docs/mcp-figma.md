@@ -80,7 +80,7 @@ Without a code, it resolves the plugin's loaded selection or the sole unexpired 
 multiple unclaimed selections require a code. After initial pairing, an agent can read a newly prepared
 selection and import it without asking the person to paste its code into the plugin again.
 
-`explorer_discover_figma_desktop` probes Figma's official local MCP at `http://127.0.0.1:3845/mcp`.
+`explorer_figma_status` with `discoverDesktop: true` probes Figma's official local MCP at `http://127.0.0.1:3845/mcp`.
 It detects an enabled server, not an arbitrary running desktop process. According to
 [Figma's desktop MCP documentation](https://developers.figma.com/docs/figma-mcp-server/local-server-installation/),
 that server requires enabling in Figma and does not write to the canvas. It cannot replace opening
@@ -91,32 +91,59 @@ discovery endpoint or control the person's UI to bypass this step.
 
 ## 2. Add UI Explorer to the model's MCP client
 
-Configure the client to launch:
+Install the npm package in this app's devDependencies, then run **one** of these from the app root:
 
 ```sh
-node /absolute/path/to/web-app-ui-explorer/dist/node/cli.js mcp --root /absolute/path/to/app --base-url http://localhost:8443
+npx ui-explorer mcp install --client vscode --base-url http://localhost:8443
+npx ui-explorer mcp install --client codex --base-url http://localhost:8443
 ```
 
-Use the reachable URL of the app serving Explorer. `--root` must be the same project whose Explorer
-started the bridge. The MCP server reads that project's `.ui-explorer/bridge.json` automatically;
-do not paste the connection URL or token into the model's instructions.
+Choose your client. The command writes only `.vscode/mcp.json` or `.codex/config.toml` in this app,
+plus the managed guidance section in `AGENTS.md`. It preserves unrelated servers and comments;
+malformed files and conflicting entries fail without overwriting the configuration. Repeating the
+same setup is idempotent. VS Code configuration uses `${workspaceFolder}` for portable paths. Codex
+configuration uses explicit absolute paths; rerun installation after moving/cloning the app or
+changing the Node installation. Custom settings inside its managed block require manual review.
+An existing VS Code entry with different settings must be reviewed and removed before reinstalling.
 
-For an app-local package, the CLI is at
-`<app>/node_modules/@danielfransix/web-app-ui-explorer/dist/node/cli.js`. For a local development
-checkout, build it first and use that checkout's `dist/node/cli.js`. Keep the CLI and plugin builds
-up to date together.
+Use the reachable URL of the app **serving Explorer**, which may be the standalone proxy rather than
+the original app URL. Pass `--route /custom/explorer` for a custom route. Omit `--base-url` for saved
+catalog discovery only: this does not include live-only manual registrations or allow capture.
+Restart the client after installation; approve/trust the project using that client's normal setup.
+Keep the CLI, running Explorer and companion plugin up to date together.
 
-Clients that accept an `mcpServers` JSON object can use this Windows example, with their own paths:
+### Project scope is required
+
+Do not install this MCP server in user/global configuration or reuse one pointed at another app.
+The installer has no global mode and requires a locally installed dependency. In a monorepo, run
+setup with the app package as `--root`, and open that app as the client's workspace folder. The
+server's working directory must equal `--root`; launching it from another directory fails. When
+the client supplies MCP workspace roots, each call checks that they contain this app, including
+after workspace changes. Every live catalog fetch checks the serving checkout's identity before
+capture/export, including per-call URL overrides. Figma operations check this project's bridge
+metadata; a prepared import code cannot redirect an MCP session to another project's bridge.
+
+Workspace roots are client-supplied context, not authentication. Clients which do not advertise
+roots cannot reliably reveal an active-editor mismatch. Always call `explorer_catalog` first and
+compare `project.root` with the intended app directory. These safeguards prevent accidental routing;
+they are not an OS sandbox or protection against a malicious client or edited local files. If a
+client cannot load project-local MCP configuration, report the limitation instead of installing a
+shared global fallback. Remove any old global Explorer entry in that client's settings yourself;
+the installer does not read or alter user configuration.
+
+For a client requiring manual setup, here is a project-local VS Code `.vscode/mcp.json` example:
 
 ```json
 {
-  "mcpServers": {
+  "servers": {
     "ui-explorer": {
+      "type": "stdio",
       "command": "node",
+      "cwd": "${workspaceFolder}",
       "args": [
-        "C:/projects/web-app-ui-explorer/dist/node/cli.js",
+        "${workspaceFolder}/node_modules/@danielfransix/web-app-ui-explorer/dist/node/cli.js",
         "mcp",
-        "--root", "C:/projects/my-app",
+        "--root", "${workspaceFolder}",
         "--base-url", "http://localhost:8443"
       ]
     }
@@ -124,9 +151,21 @@ Clients that accept an `mcpServers` JSON object can use this Windows example, wi
 }
 ```
 
-Configuration format and location depend on the client. Enable the server, reload its tools or restart
-the client, and allow its tool calls when prompted. No special phrase, slash command or plugin trigger
-is required after both connections are active.
+For project-local Codex `.codex/config.toml`, use absolute paths appropriate to your machine:
+
+```toml
+[mcp_servers.ui-explorer]
+command = "node"
+cwd = "C:/projects/my-app"
+args = ["C:/projects/my-app/node_modules/@danielfransix/web-app-ui-explorer/dist/node/cli.js", "mcp", "--root", "C:/projects/my-app", "--base-url", "http://localhost:8443"]
+```
+
+Project MCP configuration and `cwd` follow the official
+[Codex MCP guide](https://learn.chatgpt.com/docs/extend/mcp) and
+[VS Code configuration reference](https://code.visualstudio.com/docs/agents/reference/mcp-configuration).
+Enable the server, reload its tools or restart the client. No special trigger phrase is required.
+For local package development, build this repository and launch its CLI from the target app's working
+directory with that same `--root`; the installation command intentionally requires an app-local dependency.
 
 Discovery can read a saved scenario catalog without a running app. Captures and imports require the
 app; supplying `--base-url` also discovers its live registered states. Authentication for captures can
@@ -145,22 +184,77 @@ The model should discover exact IDs or folder paths before exporting. Its tools 
 
 | Tool | Purpose |
 | --- | --- |
-| `explorer_list_groups` | Find groups and their counts. |
-| `explorer_list_folders` | Find exact source-folder scopes and counts. |
-| `explorer_list_screens` | Find screen/state IDs, with optional folder, group or kind filters. |
-| `explorer_get_counts` | Check the expected screen and screen/width counts. |
-| `explorer_figma_status` | Check plugin connectivity, connected file/page, pending work and MCP clients. |
+| `explorer_catalog` | Project identity/root, search, paginated screens/groups/folders and exact counts. |
+| `explorer_inspect_screen` | Resolve an exact generated UUID/reference or internal key; source, safe action summaries, incoming/outgoing connections and evidence. No replay or capture. |
+| `explorer_figma_status` | Plugin connectivity, file/page, pending work, MCP clients; optional `discoverDesktop: true` checks native desktop MCP availability. |
 | `explorer_review_interrupted_commands` | Acknowledge specific interrupted commands after inspecting their outcome with native Figma tools. Does not retry, undo or edit content. |
 | `explorer_get_prepared_import` | Read exact screens, folders, widths and layer mode from a short import code, even before the plugin connects. Without a code, resolves the loaded or sole prepared selection. |
-| `explorer_discover_figma_desktop` | Detect Figma's official localhost MCP and list its tools without controlling the desktop. |
-| `explorer_get_screen_design` | Capture one ID and return a design plan; this does not write to Figma. |
+| `explorer_get_screen_design` | Capture one `screenId`, `reference` or internal `id` at specified widths. Does not write to Figma. |
 | `explorer_export_to_figma` | Capture, build, arrange and verify the selected scope through the plugin. |
 
-An export call uses explicit widths and placement. Replace the sample ID with one returned by discovery:
+### Catalog queries and pagination
+
+Call `explorer_catalog` with `{}` for the first 50 screens, or use `view: "groups"`, `"folders"` or
+`"summary"`. Optional `search` matches generated UUID, internal ID, title, group or source. `folder`
+matches a source folder and descendants with an exact path boundary. `group` is exact. `kind` is
+optional; omitting it includes screens, navigation, overlays and variants. A missing kind means screen.
+
+Set `limit` from 1 to 100. Repeat the **same query** with `cursor: nextCursor` until it returns null.
+Changing the query or catalog invalidates the cursor; restart listing rather than skipping results.
+`total` and `byKind` cover all matching screens. `totalItems` counts entries for the chosen view.
+When supplying `widths` (1–12 values, each 1–7680px), `expectedFrames` covers the whole matching scope;
+`expected` is returned for the current screens page only. Aggregate every page's exact pairs before
+checking a complete batch. Width duplicates are counted once. Summary views do not return pairs.
+Discovery/inspection return no replay selectors or filled values. Live records include `revision`
+and `generatedAt` when available; these are metadata, not a successful rendering check.
+
+### Screen IDs and references
+
+Expand a screen in Gallery or Canvas and choose **Copy screen ID** in its preview toolbar. The same
+control exists in full-screen preview. Paste the UUID into your question, for example:
+
+> Explain what leads to screen `a7d43ec1-b6cf-4c9b-8576-adb52744bb82`.
+
+The agent calls `explorer_inspect_screen` with `{"screenId":"a7d43ec1-b6cf-4c9b-8576-adb52744bb82"}`.
+The tool resolves it exactly. Even screens with the same name and source file have different UUIDs.
+If clipboard access is denied, a selected text field lets you copy the UUID manually.
+
+Explorer generates UUID v4 identifiers, independently of source syntax, framework, titles and folders,
+and stores them in **`ui-explorer.ids.json` at the app root**. Commit this file; teammates and future
+clones then use the same UUIDs. Do not put it in `.ui-explorer/`, regenerate it on every run, or ignore
+it with the disposable capture cache. The registry contains hashed crawler anchors/internal keys
+and IDs, with no replay recipes or bridge credentials. Atomic writes and a short cross-process lock
+prevent concurrent Explorer/MCP instances from losing assignments. A corrupt registry is reported,
+never silently replaced. Source/package updates preserve the registry.
+
+Registered screens retain UUIDs while their internal keys remain stable, regardless of title, folder
+or order changes. Set a unique `identityKey` on a registered scenario to preserve its identity while
+renaming the internal key. Declare it at first discovery, or add it while keeping the old internal
+key, let Explorer save the registry, then rename the internal key. Crawled states use hashed replay
+recipes and start paths, so a renamed or reused title slug does not give one state another's UUID.
+Recipe changes can create a new identity;
+Explorer does not guess by visual similarity. Identical legacy recipes remain distinct by internal
+key, and duplicate explicit `identityKey` values fail. Retired IDs are reserved rather than recycled.
+Resolve identity-file merge conflicts by preserving established assignments and checking UUID
+uniqueness; do not generate new IDs for the entire project.
+
+Catalog records contain `screenId` (generated UUID), `id` (internal scenario key) and a full
+`reference`, formatted `uix-screen:v1:<project-UUID>:<screen-UUID>`. Both the bare UUID and reference
+are accepted by inspection/capture, using `screenId` or `reference` respectively. A foreign project
+reference is rejected; unknown/retired bare IDs fail instead of selecting a similarly named screen.
+The persistent project UUID travels with the registry. It is distinct from `project.id`, the local
+checkout identity used to verify the running app URL and bridge. Moving/cloning changes that routing
+identity while retaining the generated screen UUIDs when the registry is copied.
+Generated UUIDs are additive: existing scenario keys, replay endpoints and Figma import matching
+remain compatible, so assigning UUIDs does not create duplicate Figma frames for existing imports.
+
+### Export example
+
+An export call uses explicit widths and placement. Replace the sample UUID with one returned by discovery:
 
 ```json
 {
-  "ids": ["role-settings"],
+  "screenIds": ["a7d43ec1-b6cf-4c9b-8576-adb52744bb82"],
   "widths": [1440, 390],
   "createComponents": false,
   "placement": { "mode": "current-page", "container": "Hiring review" },
@@ -168,11 +262,34 @@ An export call uses explicit widths and placement. Replace the sample ID with on
 }
 ```
 
-Use `folder` or `group` instead of `ids` for a whole scope. Horizontal layout uses
+Use exactly one of `screenIds`, `references` or legacy internal `ids`; folder/group filters may narrow
+that selection, and every requested ID must exist in the narrowed scope. Use `folder` or `group`
+alone for a whole scope. Horizontal layout uses
 `"layout": { "mode": "horizontal", "gap": 80 }`. `createComponents: false` creates regular editable
 layers; omitting it creates reusable components and instances. The final result reports missing or
 unexpected screen/width pairs and protected-edit conflicts. A successful connection alone does not
 mean an import has succeeded.
+
+### Migrating older MCP configurations
+
+The MCP surface contains exactly seven tools. Four overlapping discovery tools were consolidated and desktop
+discovery became an option on status. Update clients/automation using this mapping:
+
+| Old tool | Current call |
+| --- | --- |
+| `explorer_list_screens` | `explorer_catalog` (`view: "screens"`, follow pagination) |
+| `explorer_list_groups` | `explorer_catalog` (`view: "groups"`) |
+| `explorer_list_folders` | `explorer_catalog` (`view: "folders"`) |
+| `explorer_get_counts` | `explorer_catalog` (`view: "summary"`, optional widths) |
+| `explorer_discover_figma_desktop` | `explorer_figma_status` (`discoverDesktop: true`) |
+
+The old tools and their compatibility flag have been removed. There is no alternate MCP tool set:
+only the seven tools above are registered. Update automation using the mapping above, remove the
+old flag from launch arguments, and refresh the client's tool list. Unsupported MCP options fail
+with an error rather than silently enabling a different configuration. Existing capture/export
+calls with internal IDs remain supported. Set the client `cwd` explicitly, move old global entries into project configuration,
+update the package, restart the running Explorer/bridge, and refresh the managed AGENTS section with
+`npx ui-explorer agents` (or rerun project MCP installation).
 
 ## Connection feedback in the plugin
 
@@ -194,6 +311,15 @@ It does not announce an export or grant additional permission to write.
 
 - **The model cannot see the tools:** check the command and paths, enable the MCP server in its
   client, and reload the tools. UI Explorer cannot register itself in every model client automatically.
+- **Project scope or identity mismatch:** open the correct app folder, rerun project-local setup and
+  check the returned catalog root. Update/restart Explorer and its bridge if either has no identity;
+  never disable the checks to reuse another project's server. A moved checkout needs fresh local
+  launch paths but retains UUIDs through its committed identity registry.
+- **A copied ID cannot be found:** confirm the registry is present and the intended project is active.
+  Saved-only discovery may lack live registered screens. Removed screens are not substituted by name.
+- **The ID registry is invalid/busy:** restore corrupt JSON from version control, or wait for the
+  other process to finish. A crashed process can leave `ui-explorer.ids.json.lock`; remove that lock
+  directory only after confirming no Explorer/MCP process is assigning IDs. Keep the registry file.
 - **No plugin connected:** open the plugin in the target file and connect it to the same project's
   bridge. An MCP session and a plugin session are separate connections.
 - **MCP is connected but capture fails:** check `--base-url`, the Explorer route and app login.

@@ -103,7 +103,7 @@ async function fixture(run){
 }
 
 test('real crawls retain button, link, option and form-step evidence without values',{timeout:60000},async()=>{
- await fixture(async(root,target)=>{
+ await fixture(async(_root,target)=>{
   const result=await crawl({baseUrl:target,maxStates:30,maxDepth:4,timeBudgetMs:25000,concurrency:1})
   const app=result.scenarios.find(s=>s.title==='App')
   assert.equal(app.transition.steps.at(-1).role,'link')

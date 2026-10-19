@@ -12,7 +12,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const page = fs.readFileSync(path.join(here, "fixtures/demo/index.html"), "utf8")
 
 function serve() {
-  const server = http.createServer((request, response) => {
+  const server = http.createServer((_request, response) => {
     response.setHeader("Content-Type", "text/html; charset=utf-8")
     response.end(page)
   })

@@ -17,6 +17,55 @@ Figma operation.
 
 ## Working through a task
 
+### Project-local MCP and exact screen IDs
+
+Install the npm package in the app's devDependencies, then run one of these **inside that app**:
+
+```sh
+npx ui-explorer mcp install --client vscode --base-url http://localhost:8443
+npx ui-explorer mcp install --client codex --base-url http://localhost:8443
+```
+
+Choose the client you use. Setup writes `.vscode/mcp.json` or `.codex/config.toml` in this project,
+preserving other servers. There is no global installation. Restart the client; Codex project config
+must be trusted. Use this project's installed package, working directory and Explorer URL. In a
+monorepo, install in the app package and set its root explicitly. Never reuse a global MCP server
+pointed at another app. If the client cannot load project configuration, report that limitation;
+do not work around it by pointing a shared global server at this project.
+
+Call `explorer_catalog` first and compare `project.root` to the active app directory. It replaces
+the old list-groups/list-folders/list-screens/counts tools with `view: screens|groups|folders|summary`,
+optional folder/group/kind/search filters, and pagination (`limit`, then `nextCursor` as `cursor`
+with unchanged filters). All kinds are included unless filtered. Counts cover the entire filter;
+when widths are requested, `expected` contains only that screen page's exact pairs. Read every page
+before claiming complete coverage. `project.catalog` distinguishes live data from a saved catalog.
+Without a base URL, live-only registered screens are unavailable. Do not claim that saved discovery
+proves the app is reachable or that a screen can render.
+
+Explorer generates random UUIDs for screens in `ui-explorer.ids.json`. Commit this file to share
+stable IDs across clones. It contains no replay recipes or credentials. Never regenerate it just
+to resolve an error. Internal scenario keys, titles and folders are not generated screen IDs.
+When the person supplies a copied UUID, call `explorer_inspect_screen` with `screenId`. Its output
+includes the internal `id`, generated `screenId`, source and connection evidence. A full `reference`
+from the catalog is also accepted. Never choose by title when an exact ID was supplied. If the ID
+is missing, stale or from another project, explain that and refresh discovery; do not substitute a
+similarly named screen. Captures accept `screenId`/`reference`; exports accept `screenIds`/`references`
+as alternatives to internal `ids`. Keep the person's exact selection.
+
+Generated UUIDs are independent of names, folders, framework and source syntax. Registered screens
+retain their UUID while their scenario key stays stable; integrations can declare a unique stable
+`identityKey` when changing that key. Crawled screens use replay-recipe anchors so reordered title
+slugs cannot silently inherit another state's UUID. A changed recipe can produce a new UUID. Do not
+infer identity from visual similarity. Removed IDs stay reserved and are never recycled.
+
+The server rejects a working directory different from `--root`, checks client workspace roots when
+available, and verifies live Explorer and bridge checkout identities. Clients without workspace-root
+support cannot reveal an active-editor mismatch reliably; the agent must still compare the returned
+root. These checks prevent accidental cross-project routing, not malicious clients or filesystem
+access outside an OS sandbox. See the package's `docs/mcp-figma.md` for configuration and migration.
+
+### Import workflow
+
 1. Confirm the source selection, capture widths, output mode and target Figma file. Use Explorer's
    catalog for source facts and Figma's native tools for file facts. A connected bridge alone does
    not identify the target file to the native MCP tools.
@@ -38,7 +87,7 @@ Figma operation.
   person to retype details already carried by the prepared import. Do not repeat tokens or codes
   in output or logs. An expired code requires a newly prepared selection.
 - Check `explorer_figma_status` for the connected importer's file and page before writing. Use
-  `explorer_discover_figma_desktop` to detect Figma's official local MCP when useful, then use native
+  `explorer_figma_status` with `discoverDesktop: true` to detect Figma's official local MCP when useful, then use native
   Figma tools for file operations. Desktop MCP availability alone does not mean the importer is open
   or paired. Never silently choose a different file or local project.
 - The paired plugin keeps an authenticated WebSocket connection to the local bridge. Commands

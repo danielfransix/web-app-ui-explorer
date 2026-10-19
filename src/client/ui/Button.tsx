@@ -8,7 +8,6 @@ type ButtonVariant =
   | "ghost"
   | "ghost-slim"
   | "link-danger"
-  | "secondary-2"
 type ButtonSize = "default" | "sm" | "icon"
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {

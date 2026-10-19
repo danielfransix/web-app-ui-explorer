@@ -29,7 +29,7 @@ test('agents read prepared scope without connecting the plugin, disambiguate sel
  const pluginHeaders={Authorization:'Bearer '+bridge.token,'Content-Type':'application/json','X-UIX-Client':'test-plugin'}
  const post=(route,body)=>fetch(bridge.url+route,{method:'POST',headers:pluginHeaders,body:JSON.stringify(body)})
  try{
-  await client.connect(new StdioClientTransport({command:process.execPath,args:[cliPath,'mcp','--root',root]}))
+  await client.connect(new StdioClientTransport({command:process.execPath,cwd:root,args:[cliPath,'mcp','--root',root]}))
   const read=async(args={})=>textOf(await client.callTool({name:'explorer_get_prepared_import',arguments:args}))
   const prepared=await read({code:first.code})
   assert.equal(prepared.screenCount,2);assert.equal(prepared.frameCount,4)
@@ -64,7 +64,7 @@ test('a real MCP session appears in the plugin before any export and disappears 
  const client=new Client({name:'integration-editor',title:'Integration editor',version:'1'})
  let bridge,browser
  try{
-  await client.connect(new StdioClientTransport({command:process.execPath,args:[cliPath,'mcp','--root',root]}))
+  await client.connect(new StdioClientTransport({command:process.execPath,cwd:root,args:[cliPath,'mcp','--root',root]}))
   assert.ok((await client.listTools()).tools.length>0,'discovery works without a bridge')
   bridge=await startBridge({root,port:0})
   browser=await chromium.launch()
@@ -114,7 +114,7 @@ test("the mcp subcommand exposes scanned screens over the real MCP protocol, wit
   fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "test-app" }))
 
   const client = new Client({ name: "test-client", version: "1.0.0" })
-  const transport = new StdioClientTransport({ command: process.execPath, args: [cliPath, "mcp", "--root", root] })
+  const transport = new StdioClientTransport({ command: process.execPath, cwd: root, args: [cliPath, "mcp", "--root", root] })
   try {
     await client.connect(transport)
 
@@ -125,23 +125,23 @@ test("the mcp subcommand exposes scanned screens over the real MCP protocol, wit
 
     const tools = await client.listTools()
     const names = tools.tools.map((tool) => tool.name).sort()
-    assert.deepEqual(names, ["explorer_discover_figma_desktop", "explorer_export_to_figma", "explorer_figma_status", "explorer_get_counts", "explorer_get_prepared_import", "explorer_get_screen_design", "explorer_list_folders", "explorer_list_groups", "explorer_list_screens", "explorer_review_interrupted_commands"])
+    assert.deepEqual(names, ["explorer_catalog", "explorer_export_to_figma", "explorer_figma_status", "explorer_get_prepared_import", "explorer_get_screen_design", "explorer_inspect_screen", "explorer_review_interrupted_commands"])
 
-    const groups = textOf(await client.callTool({ name: "explorer_list_groups", arguments: {} }))
-    assert.deepEqual(groups, [{ group: "Candidate Directory", count: 1 }, { group: "Role details", count: 2 }])
+    const groups = textOf(await client.callTool({ name: "explorer_catalog", arguments: { view: "groups" } }))
+    assert.deepEqual(groups.items, [{ group: "Candidate Directory", count: 1 }, { group: "Role details", count: 2 }])
 
-    const everything = textOf(await client.callTool({ name: "explorer_list_screens", arguments: {} }))
-    assert.equal(everything.length, 3, "no kind filter is applied by default - every scenario is returned")
+    const everything = textOf(await client.callTool({ name: "explorer_catalog", arguments: {} }))
+    assert.equal(everything.items.length, 3, "no kind filter is applied by default - every scenario is returned")
 
-    const scoped = textOf(await client.callTool({ name: "explorer_list_screens", arguments: { group: "Role details" } }))
-    assert.deepEqual(scoped.map((s) => s.id).sort(), ["a", "b"])
+    const scoped = textOf(await client.callTool({ name: "explorer_catalog", arguments: { group: "Role details" } }))
+    assert.deepEqual(scoped.items.map((s) => s.id).sort(), ["a", "b"])
 
-    const counts = textOf(await client.callTool({ name: "explorer_get_counts", arguments: { group: "Role details" } }))
-    assert.deepEqual(counts, { total: 2, byKind: { screen: 1, overlay: 1 } })
-    const sized = textOf(await client.callTool({ name: "explorer_get_counts", arguments: { group: "Role details", widths: [1440, 390, 390] } }))
+    const counts = textOf(await client.callTool({ name: "explorer_catalog", arguments: { view: "summary", group: "Role details" } }))
+    assert.equal(counts.total, 2); assert.deepEqual(counts.byKind, { screen: 1, overlay: 1 })
+    const sized = textOf(await client.callTool({ name: "explorer_catalog", arguments: { group: "Role details", widths: [1440, 390, 390] } }))
     assert.equal(sized.expectedFrames, 4)
-    const folders = textOf(await client.callTool({ name: "explorer_list_folders", arguments: {} }))
-    assert.ok(folders.some((folder) => folder.folder === "test-app/src/screens/" && folder.count === 3))
+    const folders = textOf(await client.callTool({ name: "explorer_catalog", arguments: { view: "folders" } }))
+    assert.ok(folders.items.some((folder) => folder.folder === "test-app/src/screens/" && folder.count === 3))
 
     const missingBaseUrl = await client.callTool({ name: "explorer_get_screen_design", arguments: { id: "a", widths: [1440] } })
     assert.equal(missingBaseUrl.isError, true)
@@ -184,8 +184,9 @@ test("MCP bulk export discovers live-only curated states, sends every requested 
   })()
   try {
     await server.listen()
-    await client.connect(new StdioClientTransport({ command: process.execPath, args: [cliPath, "mcp", "--root", root, "--base-url", `http://localhost:${server.httpServer.address().port}`] }))
-    const response = await client.callTool({ name: "explorer_export_to_figma", arguments: { group: "Group", widths: [1440, 390], placement: { mode: "current-page" } } })
+    await client.connect(new StdioClientTransport({ command: process.execPath, cwd: root, args: [cliPath, "mcp", "--root", root, "--base-url", `http://localhost:${server.httpServer.address().port}`] }))
+    const catalog = textOf(await client.callTool({ name: "explorer_catalog", arguments: {} }))
+    const response = await client.callTool({ name: "explorer_export_to_figma", arguments: { references: catalog.items.map(s => s.reference), group: "Group", widths: [1440, 390], placement: { mode: "current-page" } } })
     assert.equal(response.isError, undefined, JSON.stringify(response))
     const result = textOf(response)
     assert.equal(result.scenarios, 2); assert.equal(result.expectedFrames, 4)
@@ -215,13 +216,17 @@ test("explorer_get_screen_design captures a real screen when a base URL is reach
     const baseUrl = `http://127.0.0.1:${server.httpServer.address().port}`
     const transport = new StdioClientTransport({
       command: process.execPath,
+      cwd: appRoot,
       args: [cliPath, "mcp", "--root", appRoot, "--base-url", baseUrl],
     })
     await client.connect(transport)
-    const result = textOf(await client.callTool({ name: "explorer_get_screen_design", arguments: { id: "screen-0", widths: [1440] } }))
+    const catalog = textOf(await client.callTool({ name: "explorer_catalog", arguments: {} }))
+    const result = textOf(await client.callTool({ name: "explorer_get_screen_design", arguments: { screenId: catalog.items[0].screenId, widths: [1440] } }))
     assert.equal(result.version, 1)
     assert.equal(result.plan.frames.length, 1)
     assert.match(JSON.stringify(result.plan), /Hello MCP/)
+    const referenced = textOf(await client.callTool({ name: "explorer_get_screen_design", arguments: { reference: catalog.items[0].reference, widths: [390] } }))
+    assert.equal(referenced.plan.frames[0].scenarioId, "screen-0")
   } finally {
     await client.close()
     await server.close()

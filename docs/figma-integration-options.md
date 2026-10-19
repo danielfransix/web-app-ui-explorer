@@ -484,7 +484,7 @@ Dependencies run roughly in this order:
 5. For clipboard access on restricted hosts and for agent use, run web-app-ui-explorer bridge --root
    <app-root>. Expand Connect local bridge and paste the printed connection URL. Keep the bridge and
    plugin open for the session.
-6. Configure the MCP command as web-app-ui-explorer mcp --root <app-root> --base-url <dev-server>.
+6. Install project-local MCP configuration with `web-app-ui-explorer mcp install --client vscode --root <app-root> --base-url <dev-server>` (or `--client codex`). Never reuse a global MCP pointed at another app; see [the MCP guide](mcp-figma.md).
    Discovery can use --route when the Explorer is mounted somewhere other than /__explorer.
 7. Ask the agent to list folders/groups, select the scope and widths, and specify the destination in
    natural language. The agent must turn that into an explicit placement parameter before exporting:

@@ -286,7 +286,7 @@ test("a dev server that is down gets a clear page, and the proxy recovers when i
     assert.equal(asData.status, 502)
     assert.match(text(asData), /Cannot reach/)
     // Back up on the same port: the next request works without restarting the proxy.
-    const again = http.createServer((req, res) => res.end("back"))
+    const again = http.createServer((_req, res) => res.end("back"))
     await new Promise((resolve) => again.listen(port, "127.0.0.1", resolve))
     try {
       assert.equal(text(await request(proxy, "/anything")), "back")
@@ -357,7 +357,7 @@ test("starting before the dev server is up waits for it when asked", async () =>
   const port = free.address().port
   await new Promise((resolve) => free.close(resolve))
   const lines = []
-  const late = http.createServer((req, res) => res.end("up"))
+  const late = http.createServer((_req, res) => res.end("up"))
   setTimeout(() => late.listen(port, "127.0.0.1"), 900)
   const started = Date.now()
   const running = await serve({ target: `http://127.0.0.1:${port}`, port: 0, root: temp(), wait: 10, log: (line) => lines.push(line) })

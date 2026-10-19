@@ -12,6 +12,8 @@ import { affectsPreviews, computeRevision } from "../revision"
 import { guessSources, listSources } from "../sources"
 import { startBridge } from "../bridge"
 import { selectionSchema } from "../local-import"
+import { projectIdentity } from "../project-identity"
+import { ensureScreenIdentities } from "../screen-identities"
 
 // Named breakpoints the manual Copy control and the Figma export plan agree on - matches the client's
 // own viewport presets (src/client/viewports.ts). A width outside this map falls back to its raw pixel
@@ -171,8 +173,12 @@ export function createExplorer(init: ExplorerInit) {
   function state() {
     const generated = readGenerated()
     const manifest = readManifest(path.join(outDir, "thumbnails"))
+    const scenarios = visible()
+    const identities = ensureScreenIdentities(root, scenarios, options.startPath ?? generated?.startPath ?? "/")
     return {
       project,
+      projectId: projectIdentity(root),
+      identities,
       startPath: options.startPath ?? generated?.startPath ?? "/",
       route,
       mode,
@@ -180,7 +186,7 @@ export function createExplorer(init: ExplorerInit) {
       revision: revision(),
       generatedAt: generated?.generatedAt,
       crawlStats: generated?.stats,
-      scenarios: visible(),
+      scenarios,
       transitions: [...(mode === "manual" ? [] : generated?.transitions ?? []), ...(options.transitions ?? [])] as Transition[],
       sources: sources().map((file) => `${project}/${file}`),
       thumbnails: manifest
