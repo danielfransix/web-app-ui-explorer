@@ -28,6 +28,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run build
+      - run: npm run figma-plugin:build
       - run: npm test
       - name: Check the tag matches the package version
         run: |

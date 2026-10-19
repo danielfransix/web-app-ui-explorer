@@ -20,6 +20,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run typecheck
       - run: npm run build
+      - run: npm run figma-plugin:build
       - run: npm test
 
   # The same contract against real bundlers that have to be downloaded: the explorer's `serve` in front of each
