@@ -11,7 +11,9 @@ import { Command } from "@phosphor-icons/react/dist/csr/Command"
 import { Compass } from "@phosphor-icons/react/dist/csr/Compass"
 import { DotsThree } from "@phosphor-icons/react/dist/csr/DotsThree"
 import { FolderSimple } from "@phosphor-icons/react/dist/csr/FolderSimple"
+import { LockSimple } from "@phosphor-icons/react/dist/csr/LockSimple"
 import { SpinnerGap } from "@phosphor-icons/react/dist/csr/SpinnerGap"
+import { TerminalWindow } from "@phosphor-icons/react/dist/csr/TerminalWindow"
 import { WarningCircle } from "@phosphor-icons/react/dist/csr/WarningCircle"
 import { X } from "@phosphor-icons/react/dist/csr/X"
 import type { Scenario } from "../shared/types"
@@ -30,12 +32,16 @@ import {
 } from "./data"
 import ScreenFrame, { CompactPreviewActivity } from "./ScreenFrame"
 import FolderNavigator from "./FolderNavigator"
+import LoginPickerBanner, { type LoginMethod } from "./LoginPickerBanner"
+import LogsPanel from "./LogsPanel"
 import ScreenPicker from "./ScreenPicker"
 import ScreenLightbox from "./ScreenLightbox"
 import FigmaExport from "./FigmaExport"
 import FigmaConnection from "./FigmaConnection"
-import ScreenSelect from "./ScreenSelect"
+import ScreenSelect, { ScreenSelectRadio } from "./ScreenSelect"
 import useArrowKeys from "./useArrowKeys"
+import { useLoginCapture } from "./useLoginCapture"
+import { useAutoLogin } from "./useAutoLogin"
 import IssuesPanel, { type Issue } from "./IssuesPanel"
 import { usePreviewIssues } from "./previewIssues"
 import { readSession, writeSession } from "./sessionState"
@@ -98,6 +104,13 @@ function JobStatus({ state }: { state: ExplorerState }) {
         </Tooltip>
       </div>
     )
+  if (crawl.status === "done" && crawl.needsLogin)
+    return (
+      <div className="design-job design-job--error" role="status" aria-label="Login needed" title="Explorer only reached a login screen. Log in once to let it see the rest of the app.">
+        <LockSimple size={16} aria-hidden="true" />
+        <span>Only a login screen was found</span>
+      </div>
+    )
   const failed = crawl.status === "error" ? crawl : capture.status === "error" ? capture : undefined
   if (failed)
     return (
@@ -135,6 +148,12 @@ function Loaded({ data }: { data: ExplorerState }) {
   // Hand-written and explored scenarios can both exist; show the curated set unless there is none.
   const hasManual = data.scenarios.some((s) => s.origin === "manual")
   const hasCrawled = data.scenarios.some((s) => s.origin !== "manual")
+  const [picking, setPicking] = useState(false)
+  const [loginPick, setLoginPick] = useState<string | undefined>(undefined)
+  const [loginMethod, setLoginMethod] = useState<LoginMethod | undefined>(undefined)
+  const loginCapture = useLoginCapture()
+  const autoLogin = useAutoLogin()
+  const [logsOpen, setLogsOpen] = useState(false)
   const [chosenOrigin, setChosenOrigin] = useState<Origin | undefined>(() => {
     const saved = readSession("origin")
     return saved === "manual" || saved === "crawled" || saved === "both" ? saved : undefined
@@ -412,6 +431,29 @@ function Loaded({ data }: { data: ExplorerState }) {
         <Heading className="design-workbench-brand text-sm font-semibold">UI Explorer</Heading>
         <div className="design-workbench-header-actions">
           <JobStatus state={data} />
+          {!isStatic && (
+            <>
+              <Tooltip label="Log in" side="bottom">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label="Log in"
+                  onClick={() => {
+                    setLoginPick(undefined)
+                    setPicking(true)
+                  }}
+                >
+                  <LockSimple size={18} aria-hidden="true" />
+                </Button>
+              </Tooltip>
+              <Tooltip label="Logs" side="bottom">
+                <Button variant="outline" size="icon" aria-label="Logs" onClick={() => setLogsOpen(true)}>
+                  <TerminalWindow size={18} aria-hidden="true" />
+                </Button>
+              </Tooltip>
+              <LogsPanel open={logsOpen} onOpenChange={setLogsOpen} />
+            </>
+          )}
           <ContextPanel
             label="Workspace overview"
             open={infoOpen}
@@ -478,6 +520,47 @@ function Loaded({ data }: { data: ExplorerState }) {
           </ContextPanel>
         </div>
       </header>
+      {(picking || loginMethod || loginCapture.watching) && (
+        <LoginPickerBanner
+          method={loginMethod}
+          watching={loginCapture.watching}
+          pastPassword={loginCapture.pastPassword}
+          starting={autoLogin.starting}
+          saving={loginCapture.saving}
+          error={autoLogin.error}
+          pick={loginPick}
+          onCancel={() => {
+            if (loginCapture.watching) loginCapture.cancel()
+            setPicking(false)
+            setLoginPick(undefined)
+            setLoginMethod(undefined)
+          }}
+          onConfirm={() => {
+            setPicking(false)
+            setLoginMethod("choose")
+          }}
+          onChooseManual={() => {
+            const scenario = data.scenarios.find((s) => s.id === loginPick)
+            if (scenario) loginCapture.start(scenario, data.startPath)
+            setLoginMethod("manual")
+          }}
+          onChooseAuto={() => setLoginMethod("auto")}
+          onAutoSubmit={(username, password, headless) => {
+            const scenario = data.scenarios.find((s) => s.id === loginPick)
+            if (scenario) {
+              void autoLogin.start(scenario, data.startPath, username, password, headless)
+              setLoginMethod(undefined)
+              setLoginPick(undefined)
+            }
+          }}
+          onFinish={() => {
+            void loginCapture.finish().then(() => {
+              setLoginMethod(undefined)
+              setLoginPick(undefined)
+            })
+          }}
+        />
+      )}
       <div className="design-workbench-layout">
         <FolderNavigator
           tree={folderTree}
@@ -609,9 +692,13 @@ function Loaded({ data }: { data: ExplorerState }) {
               <FlowCanvas scenarios={filtered} connections={connections} onOpen={setExpandedId} selectedIds={screenSelection} onSelect={setScreenSelected} />
             </Suspense>
           ) : (
-            <section className="design-screen-grid" aria-label="Screen gallery">
+            <RadioGroup
+              value={loginPick}
+              onValueChange={(value) => { if (picking) setLoginPick(value as string) }}
+              render={<section className="design-screen-grid" aria-label="Screen gallery" />}
+            >
               {filtered.map((s: Scenario) => (
-                <article key={s.id} className="design-screen-card" data-selected={screenSelection.has(s.id)}>
+                <article key={s.id} className="design-screen-card" data-selected={picking ? loginPick === s.id : screenSelection.has(s.id)}>
                   <div className="design-screen-card__preview">
                     <ScreenFrame scenario={s} compact />
                     {/* Text-free overlay: the thumbnail's status text stays outside the button's name. */}
@@ -623,7 +710,11 @@ function Loaded({ data }: { data: ExplorerState }) {
                   </div>
                   <div className="design-screen-card__body">
                     <div className="design-screen-card__heading">
-                      <ScreenSelect title={s.title} checked={screenSelection.has(s.id)} onChange={checked => setScreenSelected(s.id, checked)} />
+                      {picking ? (
+                        <ScreenSelectRadio title={s.title} value={s.id} />
+                      ) : (
+                        <ScreenSelect title={s.title} checked={screenSelection.has(s.id)} onChange={checked => setScreenSelected(s.id, checked)} />
+                      )}
                       <Button className="design-screen-card__title" title={s.title} onClick={() => setExpandedId(s.id)}>
                         {s.title}
                       </Button>
@@ -637,7 +728,7 @@ function Loaded({ data }: { data: ExplorerState }) {
                   </div>
                 </article>
               ))}
-            </section>
+            </RadioGroup>
           )}
         </div>
       </div>

@@ -6,8 +6,11 @@ import path from "node:path"
 import type { Duplex } from "node:stream"
 import zlib from "node:zlib"
 import { createExplorer, type Explorer } from "./core/explorer"
+import { findAlternateCandidate, suggestDevScripts, waitForReachable } from "./dev-target-discovery"
 import { charsetOf, injectIntoHtml, rewriteCookie, rewriteLocation } from "./html"
+import { chooseOne, confirm, isInteractive } from "./interactive-prompt"
 import type { UiExplorerOptions } from "./options"
+import { spawnDevServer, type SpawnedDevServer } from "./spawn-dev-server"
 import { watchSources } from "./watch"
 
 // `serve` puts the explorer in front of any dev server. The browser talks to this server; it answers the explorer's
@@ -25,6 +28,13 @@ export type ServeOptions = UiExplorerOptions & {
   root?: string
   /** Seconds to wait for the target to start answering before listening. Default 0. */
   wait?: number
+  /**
+   * When the target still isn't reachable after waiting, and this is running in a real terminal: offer to use a
+   * detected alternative or spawn the dev server, showing exactly what was found or what will run before asking.
+   * Ignored outside a TTY (CI, scripts, a non-interactive agent invocation) — those always fall back to the
+   * existing "can't reach" behavior. Default false, so programmatic callers of `serve()` see no change.
+   */
+  interactiveDiscovery?: boolean
   /** Accept a self-signed certificate from an https target. */
   insecure?: boolean
   /** Extra Host header values to accept, for reaching the proxy by name. */
@@ -78,9 +88,73 @@ const badGateway = (target: string, message: string, html: boolean) =>
     ? `<!doctype html><meta charset="utf-8"><title>Waiting for your app</title><body style="font-family:system-ui,sans-serif;max-width:560px;margin:15vh auto;padding:0 24px;line-height:1.5"><h1 style="font-size:20px">Can't reach ${target.replace(/</g, "&lt;")}</h1><p>The explorer is running, but your dev server is not answering. Start it, then reload this page.</p><p style="color:#666">${message.replace(/</g, "&lt;")}</p></body>`
     : `Cannot reach ${target}: ${message}`
 
+/** Describes what's at the unreachable target, if anything was found, and whether the person acted on it. */
+async function recoverUnreachableTarget(args: {
+  root: string
+  configuredOrigin: string
+  log: (line: string) => void
+}): Promise<{ url: string } | { server: SpawnedDevServer; command: string } | undefined> {
+  const { root, configuredOrigin, log } = args
+  const configuredPort = Number(new URL(configuredOrigin).port) || 80
+
+  const alternate = await findAlternateCandidate(root, configuredPort)
+  if (alternate) {
+    const owner = alternate.cwd ? ` running from ${alternate.cwd}` : alternate.commandLine ? ` (${alternate.commandLine})` : ""
+    const titled = alternate.title ? `, titled "${alternate.title}"` : ""
+    const useIt = await confirm(`Nothing is answering at ${configuredOrigin}. Something is answering at ${alternate.url}${titled}${owner}. Use it for this session?`)
+    if (useIt) return { url: alternate.url }
+  }
+
+  const scripts = suggestDevScripts(root)
+  if (scripts.length === 1) {
+    const [choice] = scripts
+    const run = await confirm(`No dev server detected at ${configuredOrigin}. Run "${choice.command}" now?`)
+    if (run) return { server: spawnDevServer(choice.command, root, log), command: choice.command }
+  } else if (scripts.length > 1) {
+    const index = await chooseOne(`No dev server detected at ${configuredOrigin}. Run one of these now?`, scripts.map((s) => s.command))
+    if (index !== undefined) {
+      const choice = scripts[index]
+      return { server: spawnDevServer(choice.command, root, log), command: choice.command }
+    }
+  }
+  return undefined
+}
+
 export async function serve(config: ServeOptions): Promise<RunningServe> {
   const log = config.log ?? (() => {})
-  const target = new URL(normaliseTarget(config.target))
+  // The long form of the path: on Windows a short 8.3 name makes Node's recursive file watcher abort the process.
+  const root = fs.realpathSync.native(path.resolve(config.root ?? "."))
+
+  // Resolve the effective target before anything downstream treats it as fixed: a discovered alternative or a
+  // freshly spawned dev server both need to be known before the proxy's address, agent and headers are derived.
+  let targetAddress = normaliseTarget(config.target)
+  let spawnedDevServer: SpawnedDevServer | undefined
+  {
+    const probe = new URL(targetAddress)
+    const probePort = Number(probe.port) || (probe.protocol === "https:" ? 443 : 80)
+    const deadline = Date.now() + (config.wait ?? 0) * 1000
+    let reachable = await tryConnect(probe.hostname, probePort)
+    while (!reachable && Date.now() < deadline) {
+      log(`Waiting for ${probe.origin} ...`)
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      reachable = await tryConnect(probe.hostname, probePort)
+    }
+    if (!reachable && config.interactiveDiscovery && isInteractive()) {
+      const recovered = await recoverUnreachableTarget({ root, configuredOrigin: probe.origin, log })
+      if (recovered && "url" in recovered) {
+        targetAddress = recovered.url
+        reachable = true
+      } else if (recovered) {
+        spawnedDevServer = recovered.server
+        log(`Waiting for ${probe.origin} ...`)
+        reachable = await waitForReachable(probe.hostname, probePort, 30)
+        if (!reachable) log(`Warning: started "${recovered.command}", but ${probe.origin} is still not answering.`)
+      }
+    }
+    if (!reachable) log(`Warning: ${probe.origin} is not answering yet. The proxy shows a notice until it does.`)
+  }
+
+  const target = new URL(targetAddress)
   if (target.protocol !== "http:" && target.protocol !== "https:") throw new Error(`The target must be an http or https address, got "${config.target}".`)
   const targetOrigin = target.origin
   const targetPort = Number(target.port) || (target.protocol === "https:" ? 443 : 80)
@@ -91,25 +165,24 @@ export async function serve(config: ServeOptions): Promise<RunningServe> {
     ...(target.protocol === "https:" ? { rejectUnauthorized: !config.insecure } : {}),
   } as http.AgentOptions)
 
-  // The long form of the path: on Windows a short 8.3 name makes Node's recursive file watcher abort the process.
-  const root = fs.realpathSync.native(path.resolve(config.root ?? "."))
-  const { target: _target, port: _port, host: _host, root: _root, wait: _wait, insecure: _insecure, allowedHosts: _allowed, log: _log, ...options } = config
-  const explorer = createExplorer({ root, options })
-
-  // Is the target up? Wait for it when asked; otherwise carry on and say so.
-  const deadline = Date.now() + (config.wait ?? 0) * 1000
-  let reachable = await tryConnect(targetHostname, targetPort)
-  while (!reachable && Date.now() < deadline) {
-    log(`Waiting for ${targetOrigin} ...`)
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    reachable = await tryConnect(targetHostname, targetPort)
-  }
-  if (!reachable) log(`Warning: ${targetOrigin} is not answering yet. The proxy shows a notice until it does.`)
-
+  const {
+    target: _target,
+    port: _port,
+    host: _host,
+    root: _root,
+    wait: _wait,
+    insecure: _insecure,
+    allowedHosts: _allowed,
+    log: _log,
+    interactiveDiscovery: _interactiveDiscovery,
+    ...options
+  } = config
   const listenHost = config.host ?? "127.0.0.1"
   // A server reachable only from this machine must not answer to a foreign name: a web page could otherwise point
   // its own domain at 127.0.0.1 and talk to the explorer (DNS rebinding).
   const strictHosts = LOOPBACK.has(listenHost) || LOOPBACK.has(`[${listenHost}]`)
+  const explorer = createExplorer({ root, options, loopbackOnly: strictHosts })
+
   const allowed = new Set([...LOOPBACK, ...(config.allowedHosts ?? []).map((host) => host.toLowerCase())])
   const hostAllowed = (hostHeader: string | undefined) => !strictHosts || allowed.has(hostnameOf(hostHeader))
 
@@ -279,6 +352,7 @@ export async function serve(config: ServeOptions): Promise<RunningServe> {
       agent.destroy()
       for (const socket of sockets) socket.destroy()
       await new Promise<void>((resolve) => server.close(() => resolve()))
+      await spawnedDevServer?.stop()
     },
   }
 }

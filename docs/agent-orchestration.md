@@ -62,7 +62,7 @@ The server rejects a working directory different from `--root`, checks client wo
 available, and verifies live Explorer and bridge checkout identities. Clients without workspace-root
 support cannot reveal an active-editor mismatch reliably; the agent must still compare the returned
 root. These checks prevent accidental cross-project routing, not malicious clients or filesystem
-access outside an OS sandbox. See the package's `docs/mcp-figma.md` for configuration and migration.
+access outside an OS sandbox. See the package's `docs/figma-plugin-guide.md` for configuration and migration.
 
 ### Import workflow
 

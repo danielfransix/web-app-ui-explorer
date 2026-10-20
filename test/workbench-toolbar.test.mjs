@@ -22,7 +22,7 @@ test('workbench discloses secondary actions, explains screen sources, and gives 
   await page.goto(base+'/__explorer/')
   await page.getByRole('checkbox').first().click()
   const header=page.locator('.design-workbench-header'),search=page.getByRole('textbox',{name:'Search screen states',exact:true})
-  assert.equal(await header.getByRole('button').count(),1,'only Workspace remains in the idle header')
+  assert.equal(await header.getByRole('button').count(),3,'Log in, Logs and Workspace remain in the idle header')
   assert.equal(await page.getByRole('button',{name:'Return to UI',exact:true}).count(),0)
   assert.equal(await page.getByRole('button',{name:'Build in Figma',exact:true}).count(),0)
   for(const width of [1440,1024,800,768,540,390,320]){

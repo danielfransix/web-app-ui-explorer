@@ -2,6 +2,7 @@ import fs from "node:fs"
 import type { IncomingMessage, ServerResponse } from "node:http"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+import type { Browser, BrowserContext } from "playwright"
 import type { Scenario, ScenariosFile, Transition } from "../../shared/types"
 import { buildPlan } from "../../shared/plan"
 import { capture, readManifest } from "../capture"
@@ -14,6 +15,9 @@ import { startBridge } from "../bridge"
 import { selectionSchema } from "../local-import"
 import { projectIdentity } from "../project-identity"
 import { ensureScreenIdentities } from "../screen-identities"
+import { buildStorageState } from "../session-capture"
+import { checkPage, compareLoginCheck, type PageCheck } from "../login-check"
+import { runAutoLogin } from "../auto-login"
 
 // Named breakpoints the manual Copy control and the Figma export plan agree on - matches the client's
 // own viewport presets (src/client/viewports.ts). A width outside this map falls back to its raw pixel
@@ -32,7 +36,13 @@ type Job = {
   progress?: Record<string, unknown>
   startedAt?: number
   finishedAt?: number
+  /** Set on a finished crawl that found little besides a login screen: little to show except the login option. */
+  needsLogin?: boolean
 }
+
+// The one place every job name's idle shape is listed, so a static snapshot's placeholder jobs (below) can
+// never drift out of sync with the live ones and omit a job the client expects to find.
+const IDLE_JOBS: Record<JobName, Job> = { crawl: { status: "idle" }, capture: { status: "idle" } }
 
 const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -80,9 +90,34 @@ export type ExplorerInit = {
   options?: UiExplorerOptions
   /** Overrides the name taken from package.json. */
   project?: string
+  /**
+   * True only when the host this Explorer answers to is known to be loopback-only. Gates the automated-login
+   * credential form specifically — stricter than the general proxy's own host checking, which (by design)
+   * trusts a person's explicit choice to bind wider; a real plaintext password is sensitive enough to warrant
+   * its own, non-configurable rule rather than inheriting that trust. Default false: unknown is treated as
+   * "cannot prove this is safe," not "assume it's fine."
+   */
+  loopbackOnly?: boolean
 }
 
 export type Explorer = ReturnType<typeof createExplorer>
+
+const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"])
+
+/**
+ * The address crawl/capture/login agree the app lives at. A browser treats "localhost" and "127.0.0.1" as
+ * different origins even though they're the same server here, so a request on one and a crawl triggered
+ * against the other would silently see none of a session saved under the first — normalising every loopback
+ * alias to the same host keeps a saved session usable regardless of which one a particular tab happened to
+ * be on.
+ */
+function canonicalOrigin(req: IncomingMessage): string {
+  const host = req.headers.host ?? "localhost"
+  const separator = host.lastIndexOf(":")
+  const hostname = separator === -1 ? host : host.slice(0, separator)
+  const port = separator === -1 ? "" : host.slice(separator)
+  return `http://${LOOPBACK_HOSTNAMES.has(hostname) ? "127.0.0.1" : hostname}${port}`
+}
 
 /** A write from another site must never start a crawl: it carries a foreign Origin or is marked cross-site. */
 function isCrossSiteWrite(req: IncomingMessage): boolean {
@@ -101,10 +136,15 @@ export function createExplorer(init: ExplorerInit) {
   const options = init.options ?? {}
   const root = init.root
   const project = init.project ?? projectName(root)
+  const loopbackOnly = init.loopbackOnly ?? false
   const route = `/${(options.route ?? "/__explorer").replace(/^\/+|\/+$/g, "")}`
   const mode = options.mode ?? "merge"
   const sourceDirs = options.sources ?? ["src"]
   const outDir = path.join(root, options.dir ?? ".ui-explorer")
+  // A session saved earlier through the Explorer UI's login flow (see saveSession, below) lives here by
+  // default. Picked up automatically on the next start so it survives a restart without editing the config
+  // file — the config's own `storageState`, when set, always wins.
+  if (!options.storageState && fs.existsSync(path.join(outDir, "auth.json"))) options.storageState = path.join(outDir, "auth.json")
   let bridge: ReturnType<typeof startBridge> | undefined
   let disposed = false
   let closing: Promise<void> | undefined
@@ -154,7 +194,7 @@ export function createExplorer(init: ExplorerInit) {
       }))
 
   // ---- Jobs and events -------------------------------------------------------------------------------
-  const jobs: Record<JobName, Job> = { crawl: { status: "idle" }, capture: { status: "idle" } }
+  const jobs: Record<JobName, Job> = { ...IDLE_JOBS }
   const controllers: Partial<Record<JobName, AbortController>> = {}
   const clients = new Set<ServerResponse>()
   const send = (event: string, data: unknown) => {
@@ -168,6 +208,18 @@ export function createExplorer(init: ExplorerInit) {
   const setJob = (name: JobName, job: Job) => {
     jobs[name] = job
     send("job", { name, job })
+  }
+
+  // A rolling record of what crawl/capture/login actually did, for copying out when a run looks stuck or its
+  // result is a surprise. Kept server-side (not just the terminal `serve` happens to be running in) so it's
+  // reachable from the UI even when nobody's watching that terminal.
+  const LOG_LIMIT = 4000
+  const logs: string[] = []
+  const recordLog = (line: string) => {
+    const stamped = `[${new Date().toISOString().slice(11, 23)}] ${line}`
+    logs.push(stamped)
+    if (logs.length > LOG_LIMIT) logs.splice(0, logs.length - LOG_LIMIT)
+    send("log", { line: stamped })
   }
 
   function state() {
@@ -221,6 +273,7 @@ export function createExplorer(init: ExplorerInit) {
         storageState: options.storageState,
         blockWrites: !options.allowWrites,
         signal: controller.signal,
+        log: recordLog,
         onProgress: (progress) => {
           jobs.capture.progress = progress
           send("job", { name: "capture", job: jobs.capture })
@@ -233,7 +286,7 @@ export function createExplorer(init: ExplorerInit) {
     ping()
   }
 
-  async function startCrawl(baseUrl: string) {
+  async function startCrawl(baseUrl: string, context?: BrowserContext, concurrency?: number) {
     if (jobs.crawl.status === "running") return
     const controller = new AbortController()
     controllers.crawl = controller
@@ -244,10 +297,13 @@ export function createExplorer(init: ExplorerInit) {
         baseUrl,
         startPath: options.startPath ?? "/",
         maxStates: options.maxStates,
+        concurrency,
         deny: options.deny,
         storageState: options.storageState,
+        context,
         blockWrites: !options.allowWrites,
         signal: controller.signal,
+        log: recordLog,
         onProgress: (progress) => {
           jobs.crawl.progress = { ...progress }
           send("job", { name: "crawl", job: jobs.crawl })
@@ -271,13 +327,115 @@ export function createExplorer(init: ExplorerInit) {
       fs.writeFileSync(scenariosFile(), `${JSON.stringify(file, null, 2)}\n`)
       live = []
       const cancelled = controller.signal.aborted
-      setJob("crawl", { status: cancelled ? "cancelled" : "done", finishedAt: Date.now(), progress: { ...result.stats } })
+      // A crawl that reached hardly anything, and what it did reach has a password field, found a login wall
+      // rather than an empty app. Checked only when no session is already configured: with one configured and
+      // this still happening, the session has likely expired, which is a different, harder-to-mistake problem.
+      const needsLogin =
+        !cancelled &&
+        !options.storageState &&
+        result.scenarios.length <= 2 &&
+        Object.values(result.snapshots).some((snapshot) => snapshot.hasPasswordField)
+      setJob("crawl", {
+        status: cancelled ? "cancelled" : "done",
+        finishedAt: Date.now(),
+        progress: { ...result.stats },
+        needsLogin,
+        message: needsLogin ? "Only a login screen was found." : undefined,
+      })
       ping()
-      if (!cancelled) void startCapture(baseUrl)
+      if (!cancelled && !needsLogin) void startCapture(baseUrl)
     } catch (error) {
       live = []
       setJob("crawl", { status: "error", message: error instanceof Error ? error.message : String(error) })
       ping()
+    }
+  }
+
+  // A single page, checked once before the person starts logging in and once after, so whether the attempt
+  // actually changed anything can be judged from that one page alone instead of guessed at from the DOM of
+  // the login tab (see ../login-check for why). Keyed by URL since only one login attempt is ever in flight
+  // from the UI at a time; a stale entry is simply never matched and is harmless.
+  let pendingLoginCheck: { url: string; before: PageCheck } | undefined
+
+  function defaultSessionPath(): string {
+    return path.resolve(root, options.storageState ?? path.join(outDir, "auth.json"))
+  }
+
+  // Shared by both ways a session can be produced (captured from the person's own browser, or an automated
+  // fill-and-submit): point the explorer at the saved file, verify it against whatever was checked before the
+  // attempt, and re-explore. Neither path needs to know about the other's mechanics.
+  async function finalizeSession(out: string, baseUrl: string, checkUrl?: string) {
+    options.storageState = path.relative(root, out) || out
+    if (checkUrl && pendingLoginCheck?.url === checkUrl) {
+      const { before } = pendingLoginCheck
+      pendingLoginCheck = undefined
+      try {
+        const after = await checkPage(checkUrl, options.storageState)
+        const outcome = compareLoginCheck(before, after)
+        recordLog(
+          outcome === "changed"
+            ? `Login check: ${checkUrl} changed ("${before.title}" -> "${after.title}") — looks like it worked.`
+            : `Login check: ${checkUrl} looks the same as before (still ${after.hasPasswordField ? "showing a password field" : `titled "${after.title}"`}) — login may not have finished. Exploring anyway, but check the result.`,
+        )
+      } catch (error) {
+        recordLog(`Could not verify the login: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+    recordLog("Re-exploring with the current session.")
+    void startCrawl(baseUrl)
+  }
+
+  // Writes a session captured from the person's own browser (see ../session-capture) and re-explores with it —
+  // the server-side half of the Explorer UI's manual "Log in" flow. No browser is opened here: the person
+  // already logged in themselves, in a tab they opened, and the proof is in this very request's cookies.
+  async function saveSession(captured: { cookieHeader?: string; localStorage?: Record<string, string> }, baseUrl: string, checkUrl?: string) {
+    const out = defaultSessionPath()
+    const state = buildStorageState({ ...captured, origin: baseUrl })
+    fs.mkdirSync(path.dirname(out), { recursive: true })
+    fs.writeFileSync(out, JSON.stringify(state, null, 2))
+    recordLog(`Session saved to ${out}: ${state.cookies.length} cookie(s), ${state.origins[0]?.localStorage.length ?? 0} localStorage entr${state.origins[0]?.localStorage.length === 1 ? "y" : "ies"}.`)
+    await finalizeSession(out, baseUrl, checkUrl)
+  }
+
+  // Logs in and explores using that exact same session — no file hand-off for the crawl itself (see
+  // ../auto-login and crawl.ts's `context` option: the crawl just gets handed the live context directly).
+  // Whether it actually got anywhere is left to the crawl's own needsLogin detection to say, honestly, rather
+  // than a separate check that would just restate what the crawl is about to find out directly anyway.
+  //
+  // Headless by default: faster, and able to run the crawl's usual several concurrent workers without a
+  // window flashing through dozens of pages. Visible is an explicit choice to watch it happen or finish a
+  // step a generic selector couldn't reach — concurrency drops to 1 for that run so there's exactly one tab
+  // to follow, not several racing through pages at once.
+  async function autoLoginAndExplore(url: string, credentials: { username: string; password: string }, baseUrl: string, headless: boolean) {
+    recordLog(`Automatic login: opened ${url} ${headless ? "headlessly" : "in a visible window"}.`)
+    let browser: Browser | undefined
+    try {
+      const result = await runAutoLogin(url, credentials, headless)
+      browser = result.browser
+      const { context, outcome } = result
+      recordLog(
+        outcome === "submitted"
+          ? "Automatic login: submitted the form."
+          : "Automatic login: could not find a password field on that screen to fill.",
+      )
+
+      const out = defaultSessionPath()
+      const save = async (note: string) => {
+        const state = await context.storageState()
+        fs.mkdirSync(path.dirname(out), { recursive: true })
+        fs.writeFileSync(out, JSON.stringify(state, null, 2))
+        options.storageState = path.relative(root, out) || out
+        recordLog(`Session saved to ${out}${note}.`)
+      }
+      await save(" after logging in")
+
+      recordLog("Exploring with this same session now — no file hand-off, nothing to go stale.")
+      await startCrawl(baseUrl, context, headless ? undefined : 1)
+      await save(" after exploring")
+    } catch (error) {
+      recordLog(`Automatic login failed: ${error instanceof Error ? error.message : String(error)}`)
+    } finally {
+      await browser?.close().catch(() => {})
     }
   }
 
@@ -356,7 +514,7 @@ export function createExplorer(init: ExplorerInit) {
       if (rest === "/" || rest === "/index.html") return serveFile(res, path.join(packageFile("client", "../client"), "index.html"))
       if (rest === "/api/state") {
         json(res, state())
-        captureIfNeeded(`http://${req.headers.host ?? "localhost"}`)
+        captureIfNeeded(canonicalOrigin(req))
         return
       }
       if (rest.startsWith("/api/scenario/")) {
@@ -367,7 +525,7 @@ export function createExplorer(init: ExplorerInit) {
       if (rest === "/api/figma/connection") {
         res.setHeader("Cache-Control", "no-store")
         if (req.method !== "POST") { res.setHeader("Allow", "POST"); return json(res, { error: "Use POST to open a Figma connection" }, 405) }
-        const instance = await localBridge(`http://${req.headers.host ?? "localhost"}`)
+        const instance = await localBridge(canonicalOrigin(req))
         return json(res, { connectionUrl: instance.url + "/#" + instance.token })
       }
       if (rest === "/api/figma/imports" && req.method === "POST") {
@@ -375,7 +533,7 @@ export function createExplorer(init: ExplorerInit) {
           const selection = selectionSchema.parse(await readBody(req))
           // Resolve only the submitted IDs against this Explorer's visible catalog. No plugin browsing.
           const selected = visible()
-          const instance = await localBridge(`http://${req.headers.host ?? "localhost"}`)
+          const instance = await localBridge(canonicalOrigin(req))
           return json(res, instance.prepareImport(selection, selected, project), 201)
         } catch (error) { return json(res, { error: error instanceof Error ? error.message : String(error) }, 400) }
       }
@@ -397,7 +555,7 @@ export function createExplorer(init: ExplorerInit) {
         }
         try {
           const captures = await captureDesigns({
-            baseUrl: `http://${req.headers.host ?? "localhost"}`,
+            baseUrl: canonicalOrigin(req),
             startPath: options.startPath ?? "/",
             scenario: found,
             projectRoot: root,
@@ -425,7 +583,11 @@ export function createExplorer(init: ExplorerInit) {
         })
         return
       }
-      const origin = `http://${req.headers.host ?? "localhost"}`
+      if (rest === "/api/logs" && req.method === "GET") {
+        res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" })
+        return res.end(logs.join("\n"))
+      }
+      const origin = canonicalOrigin(req)
       if (rest === "/api/crawl" && req.method === "POST") {
         if (jobs.crawl.status === "running") return json(res, { error: "A crawl is already running" }, 409)
         void startCrawl(origin)
@@ -434,6 +596,42 @@ export function createExplorer(init: ExplorerInit) {
       if (rest === "/api/crawl" && req.method === "DELETE") {
         controllers.crawl?.abort()
         return json(res, { cancelled: true })
+      }
+      if (rest === "/api/login/check" && req.method === "POST") {
+        const body = await readBody(req)
+        const url = typeof body.url === "string" ? body.url : undefined
+        if (!url) return json(res, { error: "Missing url" }, 400)
+        try {
+          const before = await checkPage(url, options.storageState)
+          pendingLoginCheck = { url, before }
+          recordLog(`Checked ${url} before logging in: ${before.hasPasswordField ? "has a password field" : "no password field"}, titled "${before.title}".`)
+          return json(res, { before }, 200)
+        } catch (error) {
+          return json(res, { error: error instanceof Error ? error.message : String(error) }, 500)
+        }
+      }
+      if (rest === "/api/login" && req.method === "POST") {
+        const body = await readBody(req)
+        const localStorageEntries = body.localStorage && typeof body.localStorage === "object" ? body.localStorage : undefined
+        const checkUrl = typeof body.checkUrl === "string" ? body.checkUrl : undefined
+        void saveSession({ cookieHeader: req.headers.cookie, localStorage: localStorageEntries }, origin, checkUrl)
+        return json(res, { saved: true }, 202)
+      }
+      // Carries a real plaintext password and drives a live browser, so it's refused outright unless this
+      // Explorer is known to be loopback-only — stricter than the general proxy's own host checking just
+      // above, which, by design, trusts an explicit choice to bind wider. That trust doesn't extend to a
+      // feature this sensitive.
+      if (rest === "/api/login/headless" && !loopbackOnly)
+        return json(res, { error: "Automated login is only available when Explorer is bound to loopback only." }, 403)
+      if (rest === "/api/login/headless" && req.method === "POST") {
+        const body = await readBody(req)
+        const url = typeof body.url === "string" ? body.url : undefined
+        const username = typeof body.username === "string" ? body.username : undefined
+        const password = typeof body.password === "string" ? body.password : undefined
+        if (!url || !username || !password) return json(res, { error: "Missing url, username or password" }, 400)
+        const headless = body.headless !== false
+        void autoLoginAndExplore(url, { username, password }, origin, headless)
+        return json(res, { started: true }, 202)
       }
       if (rest === "/api/capture" && req.method === "POST") {
         if (jobs.capture.status === "running") return json(res, { error: "A capture is already running" }, 409)
@@ -510,7 +708,7 @@ export function createExplorer(init: ExplorerInit) {
           url: prefixed(scenario.url),
           startPath: prefixed(scenario.startPath),
         })),
-        jobs: { crawl: { status: "idle" }, capture: { status: "idle" } },
+        jobs: IDLE_JOBS,
       }),
     )
     for (const scenario of scenarios()) files.set(`${dir}/api/scenario/${encodeURIComponent(scenario.id)}.json`, JSON.stringify(scenario))

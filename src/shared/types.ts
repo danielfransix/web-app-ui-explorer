@@ -100,6 +100,8 @@ export type Snapshot = {
   listbox: boolean
   /** Lower-cased, number-free words of the visible text of the top layer. */
   tokens: string[]
+  /** True when a visible password field is on the page — a login screen, structurally rather than by wording. */
+  hasPasswordField: boolean
 }
 
 /** An element the crawler could act on, with the recipe step that would act on it. */

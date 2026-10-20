@@ -40,6 +40,24 @@ test("explores screens, dialogs and dropdown choices without any scenarios writt
     const dialog = result.scenarios.find((scenario) => scenario.title === "Help centre")
     assert.equal(dialog?.kind, "overlay")
     assert.equal(result.scenarios.find((scenario) => scenario.id === dialog?.parent)?.title, "Welcome")
+    // None of this app's states are a login screen.
+    assert.ok(Object.values(result.snapshots).every((snapshot) => !snapshot.hasPasswordField))
+  } finally {
+    server.close()
+  }
+})
+
+test("a visible password field is reported on the snapshot — the signal Explorer uses to notice a login wall", { timeout: 60_000 }, async () => {
+  const loginHtml = `<!doctype html><html><body><h1>Sign in</h1><input type="password" /></body></html>`
+  const server = http.createServer((_request, response) => {
+    response.setHeader("Content-Type", "text/html; charset=utf-8")
+    response.end(loginHtml)
+  })
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve))
+  try {
+    const { port } = server.address()
+    const result = await crawl({ baseUrl: `http://127.0.0.1:${port}`, concurrency: 1, maxStates: 5, timeBudgetMs: 60_000 })
+    assert.ok(Object.values(result.snapshots).some((snapshot) => snapshot.hasPasswordField))
   } finally {
     server.close()
   }

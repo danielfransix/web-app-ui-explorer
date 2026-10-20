@@ -4,6 +4,15 @@ import type { UiExplorerOptions } from "./options"
 
 export type { UiExplorerOptions } from "./options"
 
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"])
+/** Vite's own default (no `server.host` set) binds loopback-only; `true` or an explicit non-loopback address
+ *  does not. Mirrors the same check `serve` makes for the standalone proxy (see loopbackOnly on ExplorerInit). */
+function isLoopbackOnly(host: string | boolean | undefined): boolean {
+  if (host === undefined || host === false) return true
+  if (host === true) return false
+  return LOOPBACK_HOSTS.has(host)
+}
+
 // The Vite entry point onto the explorer core. It is optional: `web-app-ui-explorer serve` works with Vite like
 // any other dev server. The plugin only adds what Vite can do better, running on the app's own origin and starting
 // with its dev server. Everything else lives in the core.
@@ -19,7 +28,7 @@ export default function uiExplorer(options: UiExplorerOptions = {}): Plugin {
     configResolved(config) {
       building = config.command === "build"
       basePrefix = /^\.?\/?$/.test(config.base) || config.base.startsWith(".") ? "" : config.base.replace(/\/+$/, "")
-      explorer = createExplorer({ root: config.root, options })
+      explorer = createExplorer({ root: config.root, options, loopbackOnly: isLoopbackOnly(config.server.host) })
     },
 
     transformIndexHtml() {

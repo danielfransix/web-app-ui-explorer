@@ -74,69 +74,71 @@ export async function capture(options: CaptureOptions): Promise<ThumbnailManifes
   }
 
   const browser = await chromium.launch({ args: ["--no-sandbox", "--disable-dev-shm-usage"] })
+  // One context shared by every worker, not one per worker: each worker's page is a tab in this same profile,
+  // so a session refresh triggered by one is immediately visible to the rest instead of every worker
+  // independently loading the same saved session and racing the others to use it (see crawl.ts for the full
+  // reasoning — a single-use refresh token only tolerates one of these at a time).
+  const context = await browser.newContext({
+    viewport: VIEWPORT,
+    deviceScaleFactor: 1,
+    storageState: options.storageState,
+  })
+  if (options.blockWrites ?? true) {
+    await context.route("**/*", (route) => {
+      const method = route.request().method()
+      if (method === "GET" || method === "HEAD" || method === "OPTIONS") return route.continue()
+      return route.fulfill({ status: 200, contentType: "application/json", body: "{}" })
+    })
+  }
   let next = 0
   let done = 0
-  const work = async () => {
-    const context = await browser.newContext({
-      viewport: VIEWPORT,
-      deviceScaleFactor: 1,
-      storageState: options.storageState,
-    })
-    if (options.blockWrites ?? true) {
-      await context.route("**/*", (route) => {
-        const method = route.request().method()
-        if (method === "GET" || method === "HEAD" || method === "OPTIONS") return route.continue()
-        return route.fulfill({ status: 200, contentType: "application/json", body: "{}" })
-      })
-    }
-    try {
-      while (next < targets.length && !options.signal?.aborted) {
-        const scenario = targets[next++]
-        const page = await context.newPage()
-        try {
-          if (scenario.replayViewport) await page.setViewportSize(scenario.replayViewport)
-          await page.goto(new URL(previewPath(scenario, options.startPath), options.baseUrl).toString(), {
-            waitUntil: "domcontentloaded",
-          })
-          await page.waitForFunction(
-            (attribute) => document.documentElement.getAttribute(attribute) !== null,
-            STATUS_ATTRIBUTE,
-            { timeout: 30_000 },
-          )
-          const status = await page.evaluate(
-            (attribute) => document.documentElement.getAttribute(attribute) ?? "",
-            STATUS_ATTRIBUTE,
-          )
-          if (status !== "ready") throw new Error(status.replace(/^error:\s*/, "") || "The preview did not start")
-          if (scenario.replayViewport) {
-            await page.setViewportSize(VIEWPORT)
-            await page.evaluate(() => (window as Window & { __uix?: UixRuntime }).__uix!.settle(150, 1500))
-          }
-          await page.waitForTimeout(250) // let entrance animations finish
-          const file = `${scenario.id}.jpg`
-          await page.screenshot({ path: path.join(options.outDir, file), type: "jpeg", quality: 82 })
-          items[scenario.id] = { file }
-          delete failed[scenario.id]
-          log(`captured ${scenario.id}`)
-        } catch (error) {
-          failed[scenario.id] = String(error instanceof Error ? error.message : error).split("\n")[0]
-          delete items[scenario.id]
-          fs.rmSync(path.join(options.outDir, `${scenario.id}.jpg`), { force: true })
-          log(`FAILED   ${scenario.id}: ${failed[scenario.id]}`)
-        } finally {
-          await page.close().catch(() => {})
-          done++
-          writeSoon()
-          options.onProgress?.({ done, total: targets.length, last: scenario.title })
+  const work = async (_value: unknown, index: number) => {
+    if (index > 0) await new Promise((resolve) => setTimeout(resolve, index * 250))
+    while (next < targets.length && !options.signal?.aborted) {
+      const scenario = targets[next++]
+      const page = await context.newPage()
+      try {
+        if (scenario.replayViewport) await page.setViewportSize(scenario.replayViewport)
+        await page.goto(new URL(previewPath(scenario, options.startPath), options.baseUrl).toString(), {
+          waitUntil: "domcontentloaded",
+        })
+        await page.waitForFunction(
+          (attribute) => document.documentElement.getAttribute(attribute) !== null,
+          STATUS_ATTRIBUTE,
+          { timeout: 30_000 },
+        )
+        const status = await page.evaluate(
+          (attribute) => document.documentElement.getAttribute(attribute) ?? "",
+          STATUS_ATTRIBUTE,
+        )
+        if (status !== "ready") throw new Error(status.replace(/^error:\s*/, "") || "The preview did not start")
+        if (scenario.replayViewport) {
+          await page.setViewportSize(VIEWPORT)
+          await page.evaluate(() => (window as Window & { __uix?: UixRuntime }).__uix!.settle(150, 1500))
         }
+        await page.waitForTimeout(250) // let entrance animations finish
+        const file = `${scenario.id}.jpg`
+        await page.screenshot({ path: path.join(options.outDir, file), type: "jpeg", quality: 82 })
+        items[scenario.id] = { file }
+        delete failed[scenario.id]
+        log(`captured ${scenario.id}`)
+      } catch (error) {
+        failed[scenario.id] = String(error instanceof Error ? error.message : error).split("\n")[0]
+        delete items[scenario.id]
+        fs.rmSync(path.join(options.outDir, `${scenario.id}.jpg`), { force: true })
+        log(`FAILED   ${scenario.id}: ${failed[scenario.id]}`)
+      } finally {
+        await page.close().catch(() => {})
+        done++
+        writeSoon()
+        options.onProgress?.({ done, total: targets.length, last: scenario.title })
       }
-    } finally {
-      await context.close().catch(() => {})
     }
   }
   try {
     await Promise.all(Array.from({ length: Math.max(1, options.concurrency ?? 4) }, work))
   } finally {
+    await context.close().catch(() => {})
     await browser.close().catch(() => {})
   }
 

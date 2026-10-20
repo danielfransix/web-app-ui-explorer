@@ -11,6 +11,8 @@ export type JobState = {
   progress?: Record<string, number | string | undefined>
   startedAt?: number
   finishedAt?: number
+  /** Set on a finished crawl that found little besides a login screen. */
+  needsLogin?: boolean
 }
 
 export type ExplorerState = {
@@ -85,12 +87,33 @@ async function refresh() {
   }
 }
 
+// A rolling copy of what the server has logged (crawl/capture/login), for copying out when a run looks
+// stuck or its result is a surprise. Capped the same way the server caps its own buffer.
+const LOG_LIMIT = 4000
+let logLines: string[] = []
+const logListeners = new Set<() => void>()
+const notifyLogs = () => logListeners.forEach((listener) => listener())
+const subscribeLogs = (listener: () => void) => {
+  logListeners.add(listener)
+  return () => {
+    logListeners.delete(listener)
+  }
+}
+export const useLogs = () => useSyncExternalStore(subscribeLogs, () => logLines)
+export async function fetchLogs(): Promise<string[]> {
+  const response = await fetch("api/logs", { cache: "no-store" })
+  logLines = (await response.text()).split("\n").filter(Boolean)
+  notifyLogs()
+  return logLines
+}
+
 let connected = false
 export function connect() {
   if (connected) return
   connected = true
   void refresh()
   if (isStatic) return
+  void fetchLogs()
   const events = new EventSource("api/events")
   events.addEventListener("state", () => void refresh())
   events.addEventListener("job", (event) => {
@@ -102,6 +125,11 @@ export function connect() {
     state = { ...state, jobs: { ...state.jobs, [name]: job } }
     if (refreshing) refreshAgain = true
     notify()
+  })
+  events.addEventListener("log", (event) => {
+    const { line } = JSON.parse((event as MessageEvent<string>).data) as { line: string }
+    logLines = logLines.length >= LOG_LIMIT ? [...logLines.slice(1), line] : [...logLines, line]
+    notifyLogs()
   })
 }
 
@@ -126,6 +154,36 @@ export const startCrawl = () => call("api/crawl", "POST")
 export const cancelCrawl = () => call("api/crawl", "DELETE")
 export const startCapture = (only?: string[]) => call("api/capture", "POST", { only })
 export const cancelCapture = () => call("api/capture", "DELETE")
+/** Everything in this origin's localStorage, read straight from the browser — same origin as the app the proxy
+ *  fronts, so this is whatever the app itself wrote there, including after a login completed in another tab. */
+function readLocalStorage(): Record<string, string> {
+  const entries: Record<string, string> = {}
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i)
+    if (key !== null) entries[key] = localStorage.getItem(key) ?? ""
+  }
+  return entries
+}
+
+/** Checked once before a login attempt starts, so the server has something to compare against once it's done
+ *  (see useLoginCapture and ../node/login-check for why one page, not a whole crawl, is what gets compared). */
+export const checkLoginPage = (url: string) => call("api/login/check", "POST", { url }).then((response) => response.json())
+
+/** Saves the session the person just logged into (cookies ride along on this same-origin request automatically;
+ *  localStorage is read explicitly since, unlike cookies, it isn't attached to a request). `checkUrl`, when
+ *  given, must match what was passed to checkLoginPage for the server to compare before/after. */
+export const saveSession = (checkUrl?: string) => call("api/login", "POST", { localStorage: readLocalStorage(), checkUrl })
+
+export type AutoLoginResult = { started?: boolean; error?: string }
+
+/** Fills and submits a login form once, using credentials typed into Explorer's own UI for this run only —
+ *  see useAutoLogin and ../node/auto-login for the full reasoning. The same session that logs in is handed
+ *  straight to the crawl server-side; progress shows up the normal way (job status, Logs panel), not through
+ *  this call. `headless` false opens a visible window instead, for watching it work or finishing a step a
+ *  generic selector couldn't reach. Only ever available when Explorer is bound to loopback only; the server
+ *  refuses it otherwise. */
+export const submitAutoLogin = (url: string, username: string, password: string, headless: boolean): Promise<AutoLoginResult> =>
+  call("api/login/headless", "POST", { url, username, password, headless }).then((response) => response.json())
 
 /** True for states reached by doing something on a screen, as opposed to screens themselves. */
 export const isState = (scenario: Scenario) =>

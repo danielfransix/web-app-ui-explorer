@@ -428,6 +428,7 @@ function snapshot(): Snapshot {
     selected: Array.from(new Set(selected)),
     listbox: Array.from(document.querySelectorAll('[role="listbox"]')).some(isVisible),
     tokens: tokensOf(visibleText(layer)),
+    hasPasswordField: Array.from(document.querySelectorAll('input[type="password"]')).some(isVisible),
   }
 }
 
@@ -553,6 +554,13 @@ function parseColor(value: string): string | undefined {
 function parsePx(value: string | undefined): number | undefined {
   const match = value?.match(/^(-?[\d.]+(?:e[+-]?\d+)?)px$/i)
   return match ? Number(match[1]) : undefined
+}
+
+/** A parsed font-size, never below 1: a literal `font-size: 0` is a common visually-hidden-text technique, and
+ *  letting it through as-is would both divide by zero in the line-height math below and fail Figma's own
+ *  text style validation (which requires >= 1) once imported. */
+function parseFontSize(value: string | undefined): number {
+  return Math.max(1, parsePx(value) ?? 16)
 }
 
 /** Splits a comma-separated CSS value without splitting inside a function's parentheses. */
@@ -745,7 +753,7 @@ function walkDesign(
       // Superscripts often have line-height:0 while their glyphs still paint above the baseline.
       // Use a positive drawing box instead of dividing by zero and serializing NaN coordinates.
       const measuredLineHeight = parsePx(style.lineHeight)
-      const lineHeight = measuredLineHeight && measuredLineHeight > 0 ? measuredLineHeight : (parsePx(style.fontSize) ?? 16) * 1.2
+      const lineHeight = measuredLineHeight && measuredLineHeight > 0 ? measuredLineHeight : parseFontSize(style.fontSize) * 1.2
       if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
         const left = (parsePx(style.borderLeftWidth) ?? 0) + (parsePx(style.paddingLeft) ?? 0)
         const right = (parsePx(style.borderRightWidth) ?? 0) + (parsePx(style.paddingRight) ?? 0)
@@ -763,7 +771,7 @@ function walkDesign(
       node.text = {
         content,
         fontFamily: style.fontFamily,
-        fontSize: parsePx(style.fontSize) ?? 16,
+        fontSize: parseFontSize(style.fontSize),
         fontWeight: Number(style.fontWeight) || 400,
         lineHeight: measuredLineHeight === 0 ? lineHeight : measuredLineHeight ?? "normal",
         letterSpacing: style.letterSpacing === "normal" ? "normal" : parsePx(style.letterSpacing) ?? "normal",
@@ -782,7 +790,7 @@ function walkDesign(
       const range = document.createRange(); range.selectNodeContents(child)
       const box = range.getBoundingClientRect()
       if (box.width > 0 && box.height > 0) node.children.push({ tag: "#text", rect: { x: box.x - originX, y: box.y - originY, width: box.width, height: box.height }, fills: [], children: [],
-        text: { content: normalized(child.textContent), fontFamily: style.fontFamily, fontSize: parsePx(style.fontSize) ?? 16, fontWeight: Number(style.fontWeight) || 400,
+        text: { content: normalized(child.textContent), fontFamily: style.fontFamily, fontSize: parseFontSize(style.fontSize), fontWeight: Number(style.fontWeight) || 400,
           lineHeight: parsePx(style.lineHeight) ?? "normal", letterSpacing: parsePx(style.letterSpacing) ?? "normal", color: parseColor(style.color) ?? "rgb(0, 0, 0)", align: style.textAlign } })
     }
   }

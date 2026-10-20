@@ -30,8 +30,15 @@ export type CrawlOptions = {
   timeBudgetMs?: number
   /** Patterns (regular expressions) for controls that must never be clicked. */
   deny?: string[]
-  /** A Playwright storage-state file for apps behind a login. */
+  /** A Playwright storage-state file for apps behind a login. Ignored when `context` is given. */
   storageState?: string
+  /**
+   * An already-open context to crawl in, instead of launching a fresh one from `storageState` — the session
+   * that just logged in and this crawl are the exact same browser session, so there's nothing to export and
+   * re-import, and nothing that can go stale between the two. Ownership stays with the caller: crawl() never
+   * closes a context (or its browser) it didn't create itself.
+   */
+  context?: BrowserContext
   headless?: boolean
   viewport?: { width: number; height: number }
   /** Stop the page from changing anything on a server. On by default. */
@@ -166,7 +173,9 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
   const runtime = runtimeSource()
   const startUrl = new URL(startPath, options.baseUrl).toString()
 
-  const browser = await chromium.launch({
+  // A context passed in is owned by the caller: crawl() never launches, and never closes, anything it didn't
+  // create itself.
+  const browser = options.context ? undefined : await chromium.launch({
     headless: options.headless ?? true,
     args: ["--no-sandbox", "--disable-dev-shm-usage"],
   })
@@ -217,16 +226,15 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
       stats.stoppedBy = reason
     }
   }
-  const abort = () => { stop("cancelled"); void browser.close().catch(() => {}) }
+  // Closing the browser is itself what makes an in-flight page.goto()/evaluate() reject, which is what
+  // actually stops a worker quickly — but only for a browser this call launched. A caller-owned context just
+  // gets left alone: the caller decides when (and whether) to close it, since it may be running other things.
+  const abort = () => { stop("cancelled"); if (browser) void browser.close().catch(() => {}) }
   options.signal?.addEventListener("abort", abort, { once: true })
   if (options.signal?.aborted) abort()
-  const deadline = setTimeout(() => { stop("time-budget"); void browser.close().catch(() => {}) }, budget)
+  const deadline = setTimeout(() => { stop("time-budget"); if (browser) void browser.close().catch(() => {}) }, budget)
 
-  async function newContext(): Promise<BrowserContext> {
-    const context = await browser.newContext({
-      viewport,
-      storageState: options.storageState,
-    })
+  async function prepareContext(context: BrowserContext): Promise<BrowserContext> {
     // __UIX_FORCE switches the runtime on in every page, not only in preview pages.
     await context.addInitScript({ content: `window.__UIX_FORCE = true;
 ${runtime}` })
@@ -352,6 +360,7 @@ ${runtime}` })
   async function process(page: Page, item: Item) {
     if (pointless(item.via) && (!item.destination || visitedUrls.has(item.destination))) {
       stats.skipped++
+      log(`  - skipped "${item.label}": repeatedly led nowhere new`)
       return
     }
     let result = await replay(page, item.actions)
@@ -389,6 +398,7 @@ ${runtime}` })
     if (byKey.has(key) || isNearDuplicate(snapshot)) {
       stats.duplicates++
       learn(item.via, false)
+      log(`  = duplicate: "${item.label}" -> ${snapshot.url} matches a state already found`)
       return
     }
     learn(item.via, true)
@@ -456,12 +466,25 @@ ${runtime}` })
     }
   }
 
-  async function worker() {
-    let context: BrowserContext | undefined
+  // One context, shared by every worker, instead of one per worker. A worker's page is a tab in this same
+  // profile, the way a real person's tabs are: cookies and localStorage are shared and always current, so a
+  // token refresh triggered by one worker is immediately visible to the rest. With one context per worker
+  // (the previous design) each one independently loaded the same saved session and, if the app treats a
+  // refresh token as single-use the way this one does, raced the others to consume it — only one could ever
+  // win, and the other `concurrency - 1` workers would see their very first request rejected and sign
+  // themselves back out before they explored anything. A short stagger on top keeps worker start-up from
+  // hitting the exact same instant, which is the one gap sharing a context alone does not close.
+  const sharedContext = options.context
+    ? await prepareContext(options.context)
+    : await prepareContext(await browser!.newContext({ viewport, storageState: options.storageState }))
+
+  async function worker(_value: unknown, index: number) {
+    let page: Page | undefined
     try {
       if (stopped) return
-      context = await newContext()
-      const page = await context.newPage()
+      if (index > 0) await sleep(index * 250)
+      if (stopped) return
+      page = await sharedContext.newPage()
       page.on("dialog", (dialog) => void dialog.dismiss().catch(() => {}))
       for (;;) {
         if (stopped) break
@@ -493,7 +516,7 @@ ${runtime}` })
     } catch (error) {
       if (!stopped) throw error
     } finally {
-      await context?.close().catch(() => {})
+      await page?.close().catch(() => {})
     }
   }
 
@@ -503,7 +526,10 @@ ${runtime}` })
   } finally {
     options.signal?.removeEventListener("abort", abort)
     clearTimeout(deadline)
-    await browser.close().catch(() => {})
+    if (browser) {
+      await sharedContext.close().catch(() => {})
+      await browser.close().catch(() => {})
+    }
   }
   stats.seconds = Math.round((Date.now() - started) / 100) / 10
 

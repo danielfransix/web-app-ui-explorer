@@ -65,9 +65,19 @@
 .design-screen-select:hover .design-screen-select__box { border-color:var(--color-brand); }
 .design-screen-select__box { display:grid; place-items:center; width:18px; height:18px; flex-shrink:0; border:1.4px solid var(--color-slate-350); border-radius:4px; background:var(--color-canvas); color:var(--color-white); opacity:0; }
 .design-screen-select[aria-checked="true"] .design-screen-select__box { background:var(--color-brand); border-color:var(--color-brand); }
+.design-screen-select--radio .design-screen-select__box { border-radius:50%; opacity:1; }
+.design-screen-select__radio-dot { width:8px; height:8px; border-radius:50%; background:var(--color-white); }
 .design-screen-card[data-selected="true"],.design-flow-node[data-selected="true"] { border-color:var(--color-brand); box-shadow:0 0 0 1px var(--color-brand); }
 .design-screen-selection-bar { display:flex; align-items:center; flex-wrap:wrap; gap:16px; margin:0 32px 20px; padding:12px 16px; border:1px solid var(--color-border); border-radius:8px; background:var(--color-slate-100); font-size:12px; }
 .design-screen-selection-bar>span { flex:1; }
+.design-login-banner { display:flex; align-items:center; flex-wrap:wrap; gap:12px; padding:10px 32px; border-bottom:1px solid var(--color-border); background:var(--color-brand-subtle); font-size:13px; }
+.design-login-banner>span { flex:1; min-width:200px; }
+.design-login-banner--form input { max-width:220px; }
+.design-login-banner__visible { display:inline-flex; align-items:center; gap:6px; width:auto; height:auto; padding:4px 2px; background:transparent; border:0; font:inherit; color:inherit; cursor:pointer; }
+.design-login-banner__visible-box { display:grid; place-items:center; width:16px; height:16px; flex-shrink:0; border:1.4px solid var(--color-slate-350); border-radius:4px; background:var(--color-canvas); color:var(--color-white); }
+.design-login-banner__visible[data-checked] .design-login-banner__visible-box { background:var(--color-brand); border-color:var(--color-brand); }
+.design-login-banner [role="alert"] { flex-basis:100%; color:var(--color-danger); }
+.design-logs-output { max-height:50vh; overflow-y:auto; margin:0; padding:10px 12px; border:1px solid var(--color-border); border-radius:6px; background:var(--color-slate-100); font-family:ui-monospace,monospace; font-size:11px; line-height:1.5; white-space:pre-wrap; word-break:break-word; }
 .design-screen-card__title { @apply block w-full truncate text-left font-semibold text-sm; }
 .design-screen-card__path { @apply min-w-0 truncate text-2xs leading-4 text-fg-muted; }
 .design-screen-card__meta { @apply mt-1 flex min-h-6 items-center justify-between gap-2; }

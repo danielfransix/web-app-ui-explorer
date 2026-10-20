@@ -224,7 +224,7 @@ transitions: [{
 }]
 ```
 
-Steps support `type`, `label`, `role` and `description`; `details.description` adds context for the connection. Use `type: "automatic"` only when the project defines that behavior. A scenario's optional `transition` carries the same details for its `parent` connection. See the [implementation plan and QA](docs/connection-details-plan.md).
+Steps support `type`, `label`, `role` and `description`; `details.description` adds context for the connection. Use `type: "automatic"` only when the project defines that behavior. A scenario's optional `transition` carries the same details for its `parent` connection.
 
 ### Shipping it with a build
 
@@ -343,16 +343,16 @@ the plugin connection, and export a selected scope with explicit placement. Keep
 open during a batch. Existing frames are updated without duplicates, and edit conflicts are reported.
 The plugin separately shows connected MCP clients and import progress. No special trigger is needed
 once the MCP server is enabled and the plugin is connected. See the
-[MCP-to-Figma setup guide](docs/mcp-figma.md) for configuration, tool arguments and troubleshooting.
+[Figma plugin and MCP guide](docs/figma-plugin-guide.md) for configuration, tool arguments and troubleshooting.
 
 To ask an agent about one exact screen, expand its preview and use **Copy screen ID**. Explorer
 generates a random UUID for each screen, so identical titles and folders remain distinct. Paste that
 ID into your question; the agent resolves it with `explorer_inspect_screen`. Commit the generated
 `ui-explorer.ids.json` file to preserve IDs across restarts and teammates' clones. UUIDs are independent
-of framework, screen names and folders; [identity rules and migration](docs/mcp-figma.md#screen-ids-and-references)
+of framework, screen names and folders; [identity rules and migration](docs/figma-plugin-guide.md#screen-ids-and-references)
 explain what happens when discovery keys or replay recipes change.
 
-See [plugin setup](figma-plugin/README.md) and [implementation status and remaining limitations](docs/figma-integration-options.md).
+See the [Figma plugin and MCP guide](docs/figma-plugin-guide.md) for the full setup, import and troubleshooting reference.
 
 ## Development
 
@@ -373,3 +373,5 @@ test          unit and end-to-end tests; contract.mjs is the check every support
 ```
 
 The explorer page is built once and served from the package, so it does not depend on your app's React, Tailwind or aliases, and your app does not depend on it.
+
+See [docs/architecture.md](docs/architecture.md) for a deeper, plain-language tour of how every part of the explorer and the companion Figma plugin actually works internally.

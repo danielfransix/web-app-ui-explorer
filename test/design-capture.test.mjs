@@ -48,6 +48,7 @@ test("captureDesigns walks one scenario into a structured, per-width design tree
       <input value="Padded input" style="padding:12px 16px;border:1px solid #ccc;height:50px;box-sizing:border-box">
       <div style="height:40px;overflow:auto"><div style="height:100px">Scrollable content</div></div>
       <svg width="16" height="16" style="color:oklch(60% 0.2 250)" viewBox="0 0 256 256"><path d="M0 0L256 256" stroke="currentColor"/></svg>
+      <input value="Invisible field" style="font-size:0;padding:8px;border:1px solid #ccc;height:30px;box-sizing:border-box">
     </body></html>`,
   )
   const scenario = { id: "screen-0", title: "Screen 0", group: "Screens", source: "src/Home.tsx", actions: [] }
@@ -86,6 +87,14 @@ test("captureDesigns walks one scenario into a structured, per-width design tree
     assert.match(find(wide.root, (node) => node.text?.content === "Modern color").fills[0].color, /^rgb\(/, "modern CSS colors become explicit sRGB paints")
     assert.equal(heading.text.fontSize, 24)
     assert.equal(heading.text.color, "rgb(255, 255, 255)")
+
+    // A literal font-size:0 (a real technique some inputs use, e.g. to visually hide a field without hiding
+    // its hit area) must never reach Figma's own text style validation, which rejects anything below 1.
+    // Unlike a plain text leaf, an input's text box is computed straight from its padding and border — not
+    // filtered by the rendered glyph size — so this path sees the raw font-size directly.
+    const field = find(wide.root, (node) => node.text?.content === "Invisible field")
+    assert.ok(field, "the zero-font-size input was still captured as content")
+    assert.ok(field.text.fontSize >= 1, "a captured font-size is never below Figma's own minimum")
 
     // Uniform fill, border and radius resolve to one clean value each.
     const card = find(wide.root, (node) => node.tag === "div" && node.fills.some((fill) => fill.type === "solid"))

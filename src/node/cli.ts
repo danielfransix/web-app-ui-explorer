@@ -221,6 +221,7 @@ async function main() {
       port: number("port") ?? serveSettings?.port,
       host: one("host") ?? serveSettings?.host,
       wait: number("wait") ?? serveSettings?.wait,
+      interactiveDiscovery: true,
       insecure: flags.has("insecure") || serveSettings?.insecure,
       allowedHosts: flags.get("allowed-host") ?? serveSettings?.allowedHosts,
       log: (line) => console.log(line),
