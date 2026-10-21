@@ -21,7 +21,7 @@ Works with any bundler: it sits in front of your running dev server, so nothing 
 
 Usage
   web-app-ui-explorer init                       Set the project up (adds the Vite plugin, or a config file and "explorer" script)
-  web-app-ui-explorer agents --root <dir>         Add or update orchestration guidance in the project's AGENTS.md
+  web-app-ui-explorer agents --root <dir>         Add or update the tool-guide link in the project's AGENTS.md
   web-app-ui-explorer serve --url <server> ...   Put the explorer in front of your dev server
   web-app-ui-explorer snapshot --dir <build>     Add a read-only explorer to a production build folder
   web-app-ui-explorer crawl --url <server> ...   Explore the running app and write its scenarios

@@ -106,7 +106,7 @@ Press **Alt + Shift + E** (Option + Shift + E on a Mac) in your app, or use the 
 
 Requirements: Node 20+.
 
-`init` also adds the [Explorer and Figma tool boundaries](docs/agent-orchestration.md) to your project's `AGENTS.md`, preserving its other instructions. Explorer handles source discovery and capture; the importer writes designs; Figma's existing tools handle pages, sections, arrangement, annotations and inspection. The MCP server supplies the same guidance when an agent connects. For an existing setup, run `npx web-app-ui-explorer agents --root .` to add or refresh just this guidance. Installing the dependency alone does not edit project instructions.
+`init` also adds a short link to the [Explorer and Figma tool guide](docs/agent-orchestration.md) in your project's `AGENTS.md`, preserving its other instructions. Keep detailed repository rules in your project's own memory. The MCP server supplies the full tool guide when an agent connects. For an existing setup, run `npx web-app-ui-explorer agents --root .` to add or refresh the link. Installing the dependency alone does not edit project instructions.
 
 ### How it works with any bundler
 

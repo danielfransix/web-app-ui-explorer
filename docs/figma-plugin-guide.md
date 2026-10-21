@@ -135,10 +135,10 @@ commands to the plugin, which writes the captured designs and returns results. T
 need the bridge token. Design import alone does not need a separate Figma MCP connection; tasks
 involving other Figma operations need Figma's existing tools and access to the target file too.
 
-`web-app-ui-explorer init` installs the orchestration guidance into a marked section of the consuming
+`web-app-ui-explorer init` adds a short link to the tool guide in a marked section of the consuming
 project's `AGENTS.md`, preserving its other instructions. Existing installations can run
 `web-app-ui-explorer agents --root <app-root>` to add or update only that section. The package also
-sends the same guidance in its MCP initialization response, so connected clients receive the
+sends the full tool guide in its MCP initialization response, so connected clients receive the
 boundaries without relying only on local files. Installing the npm dependency by itself does not
 modify the project's instructions; run one of these setup commands.
 

@@ -123,6 +123,23 @@ test("init adds the plugin to a Vite config once and keeps generated files out o
   assert.equal((fs.readFileSync(path.join(root, ".gitignore"), "utf8").match(/\.ui-explorer\//g) ?? []).length, 1)
 })
 
+test("init replaces the old full agent guide with a pointer and preserves the project's instructions", () => {
+  const root = temp()
+  const before = "# Project instructions\n\nRead this project's own memory first.\n\n"
+  const after = "\n\n## Project checks\n\nRun the relevant checks.\n"
+  write(root, "package.json", JSON.stringify({ name: "app" }))
+  write(root, "AGENTS.md", `${before}<!-- ui-explorer:orchestration:start -->\n## UI Explorer and Figma orchestration\n\n### Responsibilities\n\nOld copied rules.\n<!-- ui-explorer:orchestration:end -->${after}`)
+  assert.equal(init(root, () => {}), true)
+  const updated = fs.readFileSync(path.join(root, "AGENTS.md"), "utf8")
+  assert.ok(updated.startsWith(before))
+  assert.ok(updated.endsWith(after))
+  assert.match(updated, /https:\/\/github\.com\/danielfransix\/web-app-ui-explorer\/blob\/main\/docs\/agent-orchestration\.md/)
+  assert.doesNotMatch(updated, /### Responsibilities|Old copied rules/)
+  assert.equal((updated.match(/ui-explorer:orchestration:start/g) ?? []).length, 1)
+  assert.equal(init(root, () => {}), true)
+  assert.equal(fs.readFileSync(path.join(root, "AGENTS.md"), "utf8"), updated)
+})
+
 test("init sets up the standalone server when there is no Vite config", () => {
   const root = temp()
   write(root, "package.json", JSON.stringify({ name: "cra-app", scripts: { start: "react-scripts start" }, dependencies: { "react-scripts": "5.0.1" } }, null, 2))
