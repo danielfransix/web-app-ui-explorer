@@ -17,7 +17,7 @@ import { TerminalWindow } from "@phosphor-icons/react/dist/csr/TerminalWindow"
 import { WarningCircle } from "@phosphor-icons/react/dist/csr/WarningCircle"
 import { X } from "@phosphor-icons/react/dist/csr/X"
 import type { Scenario } from "../shared/types"
-import { Button, ContextPanel, Heading, Input, RadioGroup, RadioOption, Tooltip } from "./ui"
+import { Button, ContextPanel, CopyField, Heading, Input, RadioGroup, RadioOption, Tooltip } from "./ui"
 import {
   cancelCapture,
   cancelCrawl,
@@ -49,6 +49,8 @@ import { thumbnailFor } from "./thumbnailCache"
 import { DEFAULT_CUSTOM_WIDTH, isCustomWidth, isViewportPreset, type ViewportPreset } from "./viewports"
 import {
   buildFolderTree,
+  decodeFolderRules,
+  encodeFolderRules,
   folderCounts,
   folderCrumb,
   pathSelected,
@@ -209,6 +211,11 @@ function Loaded({ data }: { data: ExplorerState }) {
     writeSession("sidebar-collapsed", sidebarCollapsed)
   }, [sidebarCollapsed])
   const [folders, setFolders] = useState<FolderRule[]>(() => {
+    // A `folders` link param (shared by someone else, or from an earlier visit) wins over this
+    // browser's own session, since picking a link is a more specific intent than picking up where
+    // this tab left off.
+    const fromLink = decodeFolderRules(new URLSearchParams(location.search).get("folders"))
+    if (fromLink.length) return fromLink
     const saved = readSession("folders")
     return Array.isArray(saved)
       ? saved
@@ -244,6 +251,15 @@ function Loaded({ data }: { data: ExplorerState }) {
   )
   useEffect(() => {
     writeSession("folders", folders)
+    // Mirrored into the URL too, so the address bar is always a shareable link to this folder
+    // selection. `replaceState`, not `navigate`'s `pushState`: picking folders is filtering, not
+    // moving to a new place, so it must not pile up Back-button stops.
+    const params = new URLSearchParams(location.search)
+    const encoded = encodeFolderRules(folders)
+    if (encoded) params.set("folders", encoded)
+    else params.delete("folders")
+    history.replaceState(history.state, "", `${location.pathname}?${params}`)
+    setQuery(params)
   }, [folders])
   const fullScreen = readView(query) === "screen"
   // The workbench stays mounted behind both preview sizes (including the canvas viewport).
@@ -251,6 +267,9 @@ function Loaded({ data }: { data: ExplorerState }) {
   const expandedId = query.get("preview") ?? undefined
   const selected = scenarios.find((s) => s.id === query.get("scenario"))
   const expandedScenario = scenarios.find((s) => s.id === expandedId)
+  // The address bar always mirrors view, screen and folder selection, so this is just that URL
+  // made explicit and copyable, rather than a separately maintained link.
+  const shareUrl = useMemo(() => `${location.origin}${location.pathname}?${query}`, [query])
   const filtered = useMemo(
     () =>
       selectedScenarios.filter((s) =>
@@ -317,6 +336,9 @@ function Loaded({ data }: { data: ExplorerState }) {
       params.set("returnView", mode)
       if (expandedId) params.set("preview", expandedId)
     }
+    // The folder selection is independent of which view/screen is open, so it survives navigation.
+    const folders = new URLSearchParams(location.search).get("folders")
+    if (folders) params.set("folders", folders)
     // Stepping through full-size screens replaces the top layer, rather than adding Back stops.
     updateQuery(
       params,
@@ -515,6 +537,8 @@ function Loaded({ data }: { data: ExplorerState }) {
                 Return to UI
               </Button>
             </div>
+            <CopyField id="explorer-share-link" label="Link to this view" value={shareUrl}
+              copyLabel="Copy link" copiedLabel="Copied link" fallback="Select the link above and copy it with Ctrl+C (⌘C on Mac)." />
             {!isStatic && <FigmaConnection />}
             <details className="design-workspace-shortcuts"><summary><Command size={16} />Keyboard shortcuts</summary><p>/ or Ctrl/⌘ K · Search</p><p>Alt + Shift + E · Gallery</p><p>Alt + Shift + V · Switch view</p><p>Alt + Shift + R · Refresh selection</p></details>
           </ContextPanel>

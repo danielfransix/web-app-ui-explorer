@@ -48,6 +48,26 @@ export function folderCrumb(path: string) {
     .map(folderLabel)
     .join(" › ")
 }
+// Folder selection as a shareable URL param: `path` normally, `!path` for an explicit
+// deselect override, separated by commas. Each path is percent-encoded on its own so a
+// literal comma or "!" inside a folder name can never be mistaken for the separator or flag.
+export function encodeFolderRules(rules: FolderRule[]): string {
+  return rules
+    .map((rule) => `${rule.selected ? "" : "!"}${encodeURIComponent(rule.path)}`)
+    .join(",")
+}
+export function decodeFolderRules(param: string | null): FolderRule[] {
+  if (!param) return []
+  return param
+    .split(",")
+    .filter(Boolean)
+    .map((token) => {
+      const selected = !token.startsWith("!")
+      const path = decodeURIComponent(selected ? token : token.slice(1))
+      return { path, selected }
+    })
+}
+
 // Every scenario leaves the explorer's API with a source path (a stand-in folder when no file matched).
 export const scenarioSource = (scenario: Scenario) => scenario.source ?? scenario.group
 
