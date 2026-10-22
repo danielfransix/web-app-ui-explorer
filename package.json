@@ -1,6 +1,6 @@
 {
   "name": "@danielfransix/web-app-ui-explorer",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Explore every screen and state of a web app: an automatic crawler, a source-driven explorer, a flow canvas and thumbnails. Works with any bundler and any front-end framework, or none.",
   "author": "Daniel Fransix",
   "license": "MIT",
@@ -66,7 +66,7 @@
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsup && vite build --config vite.client.config.ts",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --test-concurrency=2 test/*.test.mjs",
+    "test": "node --test --test-concurrency=2 --test-force-exit test/*.test.mjs",
     "test:ui": "node --test --test-concurrency=2 test/copy-menu.test.mjs test/connection-details.test.mjs test/export-selection.test.mjs test/figma-connection.test.mjs test/handoff.test.mjs test/modal-hierarchy.test.mjs test/preview.test.mjs test/preview-performance.test.mjs test/responsive-preview.test.mjs test/screen-id-copy.test.mjs test/screen-picker.test.mjs test/shortcuts.test.mjs test/workbench-toolbar.test.mjs test/ui-principles.test.mjs",
     "ui-explorer": "node dist/node/cli.js",
     "demo": "npm run build && vite examples/vanilla-demo",
