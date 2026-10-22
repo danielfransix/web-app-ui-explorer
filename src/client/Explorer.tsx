@@ -8,6 +8,7 @@ import { Graph } from "@phosphor-icons/react/dist/csr/Graph"
 import { MagnifyingGlass } from "@phosphor-icons/react/dist/csr/MagnifyingGlass"
 import { ArrowSquareOut } from "@phosphor-icons/react/dist/csr/ArrowSquareOut"
 import { Command } from "@phosphor-icons/react/dist/csr/Command"
+import { CaretDown } from "@phosphor-icons/react/dist/csr/CaretDown"
 import { Compass } from "@phosphor-icons/react/dist/csr/Compass"
 import { DotsThree } from "@phosphor-icons/react/dist/csr/DotsThree"
 import { FolderSimple } from "@phosphor-icons/react/dist/csr/FolderSimple"
@@ -17,7 +18,7 @@ import { TerminalWindow } from "@phosphor-icons/react/dist/csr/TerminalWindow"
 import { WarningCircle } from "@phosphor-icons/react/dist/csr/WarningCircle"
 import { X } from "@phosphor-icons/react/dist/csr/X"
 import type { Scenario } from "../shared/types"
-import { Button, ContextPanel, CopyField, Heading, Input, RadioGroup, RadioOption, Tooltip } from "./ui"
+import { Button, ContextPanel, CopyField, Disclosure, DisclosurePanel, DisclosureTrigger, Heading, Input, RadioGroup, RadioOption, Tooltip } from "./ui"
 import {
   cancelCapture,
   cancelCrawl,
@@ -163,6 +164,27 @@ function Loaded({ data }: { data: ExplorerState }) {
   useEffect(() => {
     if (chosenOrigin) writeSession("origin", chosenOrigin)
   }, [chosenOrigin])
+  // Kept as raw text so an in-progress edit (including an emptied field, meaning "use the project
+  // default") never fights the user; parsed to a positive integer only when a crawl actually starts.
+  const [maxStatesInput, setMaxStatesInput] = useState(() => {
+    const saved = readSession("crawl-max-states")
+    return typeof saved === "string" ? saved : ""
+  })
+  useEffect(() => { writeSession("crawl-max-states", maxStatesInput) }, [maxStatesInput])
+  const [timeBudgetInput, setTimeBudgetInput] = useState(() => {
+    const saved = readSession("crawl-time-budget")
+    return typeof saved === "string" ? saved : ""
+  })
+  useEffect(() => { writeSession("crawl-time-budget", timeBudgetInput) }, [timeBudgetInput])
+  const parsePositiveInt = (value: string): number | undefined => {
+    const parsed = Number(value)
+    return value.trim() && Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : undefined
+  }
+  const runCrawl = useCallback(() => {
+    const maxStates = parsePositiveInt(maxStatesInput)
+    const timeBudgetMinutes = parsePositiveInt(timeBudgetInput)
+    void startCrawl({ maxStates, timeBudgetMs: timeBudgetMinutes ? timeBudgetMinutes * 60_000 : undefined })
+  }, [maxStatesInput, timeBudgetInput])
   const origin: Origin = !hasManual ? "crawled" : !hasCrawled ? "manual" : (chosenOrigin ?? "manual")
   const scenarios = useMemo(
     () =>
@@ -527,9 +549,30 @@ function Loaded({ data }: { data: ExplorerState }) {
                 </div>
               </div>
             )}
+            {data.mode !== "manual" && !isStatic && !exploring && (
+              <Disclosure className="design-crawl-settings">
+                <DisclosureTrigger variant="outline" size="sm" className="design-crawl-settings__trigger" rightIcon={<CaretDown size={14} aria-hidden="true" />}>
+                  Crawl settings
+                </DisclosureTrigger>
+                <DisclosurePanel className="design-crawl-settings__fields">
+                  <div className="modal-field">
+                    <label className="modal-field-label" htmlFor="crawl-max-states">Max screens</label>
+                    <Input id="crawl-max-states" className="control" type="number" min={1} inputMode="numeric"
+                      placeholder={String(data.crawlDefaults?.maxStates ?? 250)}
+                      value={maxStatesInput} onChange={(event) => setMaxStatesInput(event.target.value)} />
+                  </div>
+                  <div className="modal-field">
+                    <label className="modal-field-label" htmlFor="crawl-time-budget">Time limit (min)</label>
+                    <Input id="crawl-time-budget" className="control" type="number" min={1} inputMode="numeric"
+                      placeholder={String(Math.round((data.crawlDefaults?.timeBudgetMs ?? 900_000) / 60_000))}
+                      value={timeBudgetInput} onChange={(event) => setTimeBudgetInput(event.target.value)} />
+                  </div>
+                </DisclosurePanel>
+              </Disclosure>
+            )}
             <div className="design-workspace-actions">
               {data.mode !== "manual" && !isStatic && !exploring && (
-                <Button variant="outline" size="sm" aria-label="Explore this app" leftIcon={<ArrowsClockwise size={16} />} onClick={() => { setInfoOpen(false); void startCrawl() }}>
+                <Button variant="outline" size="sm" leftIcon={<ArrowsClockwise size={16} />} onClick={() => { setInfoOpen(false); runCrawl() }}>
                   {nothingYet ? "Discover screens" : "Discover more screens"}
                 </Button>
               )}
@@ -676,7 +719,7 @@ function Loaded({ data }: { data: ExplorerState }) {
               </div>
               <Heading level={2}>Nothing explored yet</Heading>
               {data.mode !== "manual" && (
-                <Button variant="outline" onClick={() => void startCrawl()}>
+                <Button variant="outline" onClick={runCrawl}>
                   Explore this app
                 </Button>
               )}
@@ -769,7 +812,7 @@ function Loaded({ data }: { data: ExplorerState }) {
   const previewScenario = fullScreen ? selected : expandedScenario
   // Keyboard shortcuts read the latest state through a ref, so the listener is attached once.
   const shortcutState = {
-    previewScenario, filtered, scenarios, mode, exploring, navigate,
+    previewScenario, filtered, scenarios, mode, exploring, navigate, runCrawl,
     live: !isStatic, crawl: !isStatic && data.mode !== "manual",
     reset: () => setRevision((value) => value + 1),
   }
@@ -802,7 +845,7 @@ function Loaded({ data }: { data: ExplorerState }) {
         }
       } else if (event.code === "KeyX" && now.crawl && !now.exploring) {
         event.preventDefault()
-        void startCrawl()
+        now.runCrawl()
       }
     }
     document.addEventListener("keydown", keydown, true)

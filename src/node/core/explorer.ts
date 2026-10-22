@@ -6,7 +6,7 @@ import type { Browser, BrowserContext } from "playwright"
 import type { Scenario, ScenariosFile, Transition } from "../../shared/types"
 import { buildPlan } from "../../shared/plan"
 import { capture, readManifest } from "../capture"
-import { crawl } from "../crawl"
+import { crawl, DEFAULT_MAX_STATES, DEFAULT_TIME_BUDGET_MS } from "../crawl"
 import { captureDesigns } from "../design-capture"
 import type { UiExplorerOptions } from "../options"
 import { affectsPreviews, computeRevision } from "../revision"
@@ -238,6 +238,10 @@ export function createExplorer(init: ExplorerInit) {
       revision: revision(),
       generatedAt: generated?.generatedAt,
       crawlStats: generated?.stats,
+      crawlDefaults: {
+        maxStates: options.maxStates ?? DEFAULT_MAX_STATES,
+        timeBudgetMs: options.timeBudgetMs ?? DEFAULT_TIME_BUDGET_MS,
+      },
       scenarios,
       transitions: [...(mode === "manual" ? [] : generated?.transitions ?? []), ...(options.transitions ?? [])] as Transition[],
       sources: sources().map((file) => `${project}/${file}`),
@@ -286,7 +290,12 @@ export function createExplorer(init: ExplorerInit) {
     ping()
   }
 
-  async function startCrawl(baseUrl: string, context?: BrowserContext, concurrency?: number) {
+  async function startCrawl(
+    baseUrl: string,
+    context?: BrowserContext,
+    concurrency?: number,
+    overrides?: { maxStates?: number; timeBudgetMs?: number },
+  ) {
     if (jobs.crawl.status === "running") return
     const controller = new AbortController()
     controllers.crawl = controller
@@ -296,7 +305,8 @@ export function createExplorer(init: ExplorerInit) {
       const result = await crawl({
         baseUrl,
         startPath: options.startPath ?? "/",
-        maxStates: options.maxStates,
+        maxStates: overrides?.maxStates ?? options.maxStates,
+        timeBudgetMs: overrides?.timeBudgetMs ?? options.timeBudgetMs,
         concurrency,
         deny: options.deny,
         storageState: options.storageState,
@@ -590,7 +600,12 @@ export function createExplorer(init: ExplorerInit) {
       const origin = canonicalOrigin(req)
       if (rest === "/api/crawl" && req.method === "POST") {
         if (jobs.crawl.status === "running") return json(res, { error: "A crawl is already running" }, 409)
-        void startCrawl(origin)
+        const body = await readBody(req)
+        const positive = (value: unknown) => (typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined)
+        void startCrawl(origin, undefined, undefined, {
+          maxStates: positive(body.maxStates),
+          timeBudgetMs: positive(body.timeBudgetMs),
+        })
         return json(res, { started: true }, 202)
       }
       if (rest === "/api/crawl" && req.method === "DELETE") {

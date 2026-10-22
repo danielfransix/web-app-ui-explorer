@@ -18,6 +18,9 @@ import type {
   TransitionStep,
 } from "../shared/types"
 
+export const DEFAULT_MAX_STATES = 250
+export const DEFAULT_TIME_BUDGET_MS = 15 * 60_000
+
 export type CrawlOptions = {
   /** Origin of the running dev server, for example http://localhost:5173. */
   baseUrl: string
@@ -162,12 +165,12 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
   const started = Date.now()
   const log = options.log ?? (() => {})
   const startPath = options.startPath ?? "/"
-  const maxStates = options.maxStates ?? 250
+  const maxStates = options.maxStates ?? DEFAULT_MAX_STATES
   const maxDepth = options.maxDepth ?? 14
   // Each browser runs a full copy of the app. More of them than the machine can keep up with make pages
   // slow enough that recipes start to fail, so the default leaves headroom.
   const concurrency = Math.max(1, options.concurrency ?? Math.max(2, Math.min(5, Math.floor(os.cpus().length / 2))))
-  const budget = options.timeBudgetMs ?? 15 * 60_000
+  const budget = options.timeBudgetMs ?? DEFAULT_TIME_BUDGET_MS
   const deny = options.deny
   const viewport = options.viewport ?? { width: 1280, height: 900 }
   const runtime = runtimeSource()

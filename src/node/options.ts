@@ -22,8 +22,10 @@ export type UiExplorerOptions = {
   deny?: string[]
   /** A Playwright storage-state file, for apps behind a login. */
   storageState?: string
-  /** Most states a crawl records. */
+  /** Most states a crawl records. Overridable per run from the Explorer UI. */
   maxStates?: number
+  /** Longest a crawl runs, in milliseconds, before it stops on its own. Overridable per run from the Explorer UI. */
+  timeBudgetMs?: number
   /** Capture thumbnails when the explorer is opened and they are missing or out of date. On by default. */
   autoCapture?: boolean
   /**

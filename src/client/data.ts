@@ -26,6 +26,8 @@ export type ExplorerState = {
   revision: string
   generatedAt?: string
   crawlStats?: CrawlStats
+  /** This project's configured crawl limits, shown as placeholders for a per-run override. */
+  crawlDefaults?: { maxStates: number; timeBudgetMs: number }
   scenarios: Scenario[]
   transitions: Transition[]
   sources: string[]
@@ -150,7 +152,7 @@ const call = (path: string, method: "POST" | "DELETE", body?: unknown) =>
     body: body === undefined ? undefined : JSON.stringify(body),
   })
 
-export const startCrawl = () => call("api/crawl", "POST")
+export const startCrawl = (overrides?: { maxStates?: number; timeBudgetMs?: number }) => call("api/crawl", "POST", overrides)
 export const cancelCrawl = () => call("api/crawl", "DELETE")
 export const startCapture = (only?: string[]) => call("api/capture", "POST", { only })
 export const cancelCapture = () => call("api/capture", "DELETE")

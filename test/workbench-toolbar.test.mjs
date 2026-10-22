@@ -93,7 +93,7 @@ test('workbench discloses secondary actions, explains screen sources, and gives 
   await page.getByRole('button',{name:'Expand Discovered settings',exact:true}).waitFor()
   let discovered=false
   await page.route('**/__explorer/api/crawl',async route=>{discovered=true;await route.fulfill({contentType:'application/json',body:'{"started":true}'})})
-  await panel.getByRole('button',{name:'Explore this app',exact:true}).click()
+  await panel.getByRole('button',{name:'Discover more screens',exact:true}).click()
   assert.equal(discovered,true)
   await page.getByRole('checkbox',{name:'Select Registered home for Figma',exact:true}).check()
   assert.equal(await page.getByRole('region',{name:'Screen selection'}).getByRole('button',{name:'Build in Figma',exact:true}).isVisible(),true)
