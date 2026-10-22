@@ -1,6 +1,6 @@
 {
   "name": "@danielfransix/web-app-ui-explorer",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Explore every screen and state of a web app: an automatic crawler, a source-driven explorer, a flow canvas and thumbnails. Works with any bundler and any front-end framework, or none.",
   "author": "Daniel Fransix",
   "license": "MIT",
