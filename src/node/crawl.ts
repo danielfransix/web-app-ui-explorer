@@ -97,6 +97,20 @@ type W = Window & { __uix?: UixRuntime }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
+/** The click that just replayed successfully may have started a real document navigation (not an SPA
+ *  route change, which keeps the page's JS alive) that races this read. Losing that race throws
+ *  "Execution context was destroyed", not a problem with the snapshot itself — so wait for the new
+ *  document to settle and read it there, instead of counting a successful replay as a failure. */
+async function snapshotOf(page: Page): Promise<Snapshot> {
+  try {
+    return await page.evaluate(() => (window as W).__uix!.snapshot())
+  } catch (error) {
+    if (!(error instanceof Error) || !error.message.includes("Execution context was destroyed")) throw error
+    await page.waitForLoadState("load", { timeout: 20_000 }).catch(() => {})
+    return await page.evaluate(() => (window as W).__uix!.snapshot())
+  }
+}
+
 function runtimeSource(): string {
   // The shared chunk sits in dist/, the entry points in dist/node/: look in both places.
   const here = path.dirname(fileURLToPath(import.meta.url))
@@ -379,7 +393,7 @@ ${runtime}` })
       if (options.debug) log(`    ${JSON.stringify(item.actions)}`)
       return
     }
-    const snapshot = await page.evaluate(() => (window as W).__uix!.snapshot())
+    const snapshot = await snapshotOf(page)
 
     // An open dropdown is not a state: each of its choices is.
     if (snapshot.listbox && item.actions.length) {
