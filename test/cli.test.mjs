@@ -98,8 +98,9 @@ test("agents installs portable guidance, preserves project instructions and upda
   assert.equal(first.status, 0, first.stderr)
   const installed = fs.readFileSync(file, "utf8")
   assert.ok(installed.startsWith(original))
-  const guide = fs.readFileSync(new URL("../docs/agent-orchestration.md", import.meta.url), "utf8").trim()
-  assert.ok(installed.includes(guide.replace(/^#/gm, "##")), "the installed rules match the packaged guide")
+  // The installed section is a short pointer to the guide, not the guide copied in full.
+  assert.match(installed, /https:\/\/github\.com\/danielfransix\/web-app-ui-explorer\/blob\/main\/docs\/agent-orchestration\.md/, "the installed rules point to the packaged guide")
+  assert.doesNotMatch(installed, /explorer_inspect_screen/, "the guide is linked, not copied in full")
   assert.deepEqual(fs.readdirSync(root), ["AGENTS.md"], "guidance installation does not alter app setup")
   assert.equal(run(["agents", "--root", root]).status, 0)
   assert.equal(fs.readFileSync(file, "utf8"), installed, "repeated setup is idempotent")
@@ -111,7 +112,7 @@ test("agents installs portable guidance, preserves project instructions and upda
   assert.equal(run(["agents", "--root", root]).status, 0)
   const updated = fs.readFileSync(file, "utf8")
   assert.ok(updated.startsWith(original)); assert.ok(updated.endsWith(suffix))
-  assert.ok(updated.includes(guide.replace(/^#/gm, "##")))
+  assert.match(updated, /https:\/\/github\.com\/danielfransix\/web-app-ui-explorer\/blob\/main\/docs\/agent-orchestration\.md/)
   assert.ok(!updated.includes("Old guidance"))
 
   for (const malformed of [start, end, end + start, start + end + start + end]) {
@@ -123,7 +124,7 @@ test("agents installs portable guidance, preserves project instructions and upda
   }
   const empty = temp()
   assert.equal(run(["agents", "--root", empty]).status, 0)
-  assert.ok(fs.readFileSync(path.join(empty, "AGENTS.md"), "utf8").includes(guide.replace(/^#/gm, "##")))
+  assert.match(fs.readFileSync(path.join(empty, "AGENTS.md"), "utf8"), /https:\/\/github\.com\/danielfransix\/web-app-ui-explorer\/blob\/main\/docs\/agent-orchestration\.md/)
 })
 
 test("init in a Create React App project, then serve from the config it wrote", { timeout: 60_000 }, async () => {

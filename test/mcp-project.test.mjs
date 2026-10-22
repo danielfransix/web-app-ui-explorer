@@ -199,8 +199,8 @@ test("project installer preserves JSONC/TOML, is idempotent, rejects conflicts a
       assert.match(setup.stdout, /Restart your MCP client in this project/)
       const guidance = fs.readFileSync(path.join(root, "AGENTS.md"), "utf8")
       assert.match(guidance, /Preserve this instruction/)
-      assert.match(guidance, /explorer_inspect_screen/)
-      assert.match(guidance, /ui-explorer.ids.json/)
+      // The installed section is a short pointer to the guide, not the guide copied in full.
+      assert.match(guidance, /https:\/\/github\.com\/danielfransix\/web-app-ui-explorer\/blob\/main\/docs\/agent-orchestration\.md/)
     }
     const jsonFile = path.join(root, ".vscode/mcp.json"), before = fs.readFileSync(jsonFile, "utf8")
     assert.throws(() => installProjectMcp({ root, client: "vscode", baseUrl: "http://localhost:9000" }), /different settings/)
